@@ -79,3 +79,31 @@ test('Invalid portrait cannot generate a result with the previous photo',async()
   await a.run("uploadFile({type:'image/jpeg',size:2000})");
   assert.deepEqual(a.scope.calls,[]);assert.equal(a.run('userImage'),null);
 });
+
+test('Rejected non-image replacement clears the old portrait and disables stale export',async()=>{
+  const a=app();
+  a.run("userImage={oldPhoto:true};hasResult=true;referenceLayer={};$('saveBtn').disabled=false;$('canvasPlaceholder').style.display='none'");
+  await a.run("uploadFile({type:'text/plain',name:'not-a-photo.txt',size:200})");
+  assert.equal(a.run('userImage'),null);
+  assert.equal(a.run('hasResult'),false);
+  assert.equal(a.elements.get('saveBtn').disabled,true);
+  assert.equal(a.elements.get('canvasPlaceholder').style.display,'flex');
+});
+
+test('Oversized portrait replacement clears the old result before reporting an error',async()=>{
+  const a=app();
+  a.run("userImage={oldPhoto:true};hasResult=true;$('saveBtn').disabled=false");
+  await a.run("uploadFile({type:'image/jpeg',size:19*1024*1024})");
+  assert.equal(a.run('userImage'),null);
+  assert.equal(a.run('hasResult'),false);
+  assert.equal(a.elements.get('saveBtn').disabled,true);
+});
+
+test('Corrupt portrait leaves the canvas in an empty state',async()=>{
+  const a=app();
+  a.run("userImage={oldPhoto:true};hasResult=true;$('saveBtn').disabled=false;loadImage=async()=>{throw Error('corrupt')}");
+  await a.run("uploadFile({type:'image/jpeg',size:2000})");
+  assert.equal(a.run('userImage'),null);
+  assert.equal(a.elements.get('canvasPlaceholder').style.display,'flex');
+  assert.equal(a.elements.get('saveBtn').disabled,true);
+});

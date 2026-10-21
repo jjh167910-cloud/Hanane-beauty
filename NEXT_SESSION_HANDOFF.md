@@ -22,3 +22,6 @@ When Cloudflare access is restored, inspect existing projects before creating an
 ## Product boundary
 
 Browser try-on remains approximate non-AI compositing. Neither a verified segmentation model nor photorealistic generative hairstyle transfer is bundled. Do not claim either works. Photo processing remains on the device. No Android APK has been produced in this update.
+
+## Follow-up: replacement portrait safety
+Rejected, oversized and corrupt replacement photos now clear the old preview, restore the empty placeholder and disable old exports instead of retaining another person's image on screen. Photo input without a trustworthy MIME type can also be accepted by a supported image filename and is still subject to actual decode. Added three deterministic regression tests; new cache key v7. This is a source change, not evidence of an Android browser run or a live Cloudflare redeploy.

@@ -114,9 +114,19 @@ async function generate(){if(busy||loadingPhoto||!userImage||!selected)return;co
   setProgress(native?'پیش‌نمایش با استخراج AI مو آماده است. در صورت نیاز جایگذاری را تنظیم کنید.':'پیش‌نمایش تقریبی آماده است. این حالت از مدل AI استفاده نمی‌کند.');
  }catch(e){if(revision===inputRevision){setProgress('امکان ساخت پیش‌نمایش نبود: '+e.message);hasResult=false;}}
  finally{busy=false;updateBtn();if(previewQueued){previewQueued=false;requestPreview();}}}
-async function uploadFile(file){if(!file)return;if(!file.type.startsWith('image/')){setProgress('فقط تصویر قابل قبول است');return;}
+async function uploadFile(file){if(!file)return;
+ // Invalidate the previous portrait immediately, including rejected files.
+ // A failed replacement must never leave an old customer's photo or export on screen.
+ const upload=++uploadRevision;++inputRevision;
+ loadingPhoto=false;userImage=null;userMask=null;faceUser=null;
+ hasResult=false;referenceLayer=null;showBefore=false;previewQueued=false;
+ $('saveBtn').disabled=true;$('toggleBefore').textContent='نمایش عکس اصلی';
+ $('uploadLabel').textContent='انتخاب عکس از گوشی';
+ $('canvasPlaceholder').style.display='flex';drawUser();updateBtn();
+ const mime=file.type||'',filename=file.name||'';
+ if(!mime.startsWith('image/')&&!/\.(?:jpe?g|png|webp|heic|heif)$/i.test(filename)){setProgress('فقط تصویر قابل قبول است');return;}
  if(file.size>18*1024*1024){setProgress('حجم عکس بیش از ۱۸ مگابایت است');return;}
- const upload=++uploadRevision;loadingPhoto=true;userImage=null;updateBtn();++inputRevision;hasResult=false;referenceLayer=null;showBefore=false;$('saveBtn').disabled=true;$('toggleBefore').textContent='نمایش عکس اصلی';
+ loadingPhoto=true;updateBtn();
  let url;
  try{url=URL.createObjectURL(file);const img=await loadImage(url);if(upload!==uploadRevision)return;
   // Contain the whole portrait without changing its proportions. A fixed-size

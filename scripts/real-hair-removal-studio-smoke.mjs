@@ -80,13 +80,10 @@ try{
  assert.deepEqual(errors,[]);
  await page.screenshot({path:path.join(root,'ai/migan/hair-removal-studio-evidence.png'),fullPage:true});
  console.log('REAL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({...result,trial:pass.id,...comparison}));
- await page.evaluate(async()=>{
-   await navigator.serviceWorker.register('/sw.js');
-   await navigator.serviceWorker.ready;
- });
- await page.waitForFunction(()=>!!navigator.serviceWorker.controller,{timeout:30000});
- await page.reload({waitUntil:'load'});
- // Warm browser cache and save model parts; production SW uses cache-on-first-read for this experimental engine.
+ await page.locator('#prepareOffline').click();
+ await page.waitForFunction(()=>typeof window.__hananehOfflineReady==='boolean',{timeout:90000});
+ assert.equal(await page.evaluate(()=>window.__hananehOfflineReady),true,
+   'Explicit offline preparation failed: '+await page.locator('#status').textContent());
  const stored=await page.evaluate(async()=>{
    const name=(await caches.keys()).find(x=>x.startsWith('hananeh-static-'));
    const cache=await caches.open(name);

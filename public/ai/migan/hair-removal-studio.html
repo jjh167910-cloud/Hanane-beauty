@@ -15,7 +15,7 @@
 <div class="actions"><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" aria-label="انتخاب عکس">
 <select id="sample" aria-label="نمونه‌های داخل کاتالوگ"><option value="">نمونهٔ کاتالوگ (بدون ارسال اینترنتی)</option>
 <option value="1">مدل ۱ · کوتاه</option><option value="2">مدل ۲ · پیکسی</option><option value="3">مدل ۳ · فر کوتاه</option><option value="6">مدل ۶ · پیکسی</option><option value="9">مدل ۹</option></select></div>
-<p class="aside">عکس در مرورگر دستگاه باقی می‌ماند و پس از بستن صفحه ذخیره نمی‌شود. تصویر پیش‌نمایش برای اجرای مدل به ۵۱۲×۵۱۲ کاهش می‌یابد؛ تصویر کامل در خروجی تحقیقاتی ذخیره نمی‌شود.</p></section>
+<div class="actions"><button type="button" class="btn soft" id="prepareOffline">دانلود و تأیید بستهٔ آفلاین (فقط یک بار)</button></div><p class="aside">عکس در مرورگر دستگاه باقی می‌ماند و پس از بستن صفحه ذخیره نمی‌شود. تصویر پیش‌نمایش برای اجرای مدل به ۵۱۲×۵۱۲ کاهش می‌یابد؛ تصویر کامل در خروجی تحقیقاتی ذخیره نمی‌شود.</p></section>
 <section class="panel"><h2>۲. تشخیص مو و بررسی ایمنی</h2>
 <div class="actions"><button class="btn" id="analyze" disabled>تشخیص موی واقعی با AI</button><button class="btn soft" id="clear" type="button">پاک کردن تصویر و نتیجه</button></div>
 <p class="aside">ماسک باید با تشخیص واقعی چهره همراه باشد. اگر چشم‌ها مشخص نباشند یا ماسک خیلی گسترده باشد، حذف مو انجام نمی‌شود.</p>
@@ -37,6 +37,47 @@ function status(t,error=false){$('status').textContent=t;$('status').className=e
 function dropResult(){proposal=null;$('run').disabled=true;$('approve').disabled=true;$('approve').checked=false;$('download').disabled=true;window.__hananehHairStage=null;clearCanvas(maskCanvas);clearCanvas(afterCanvas);}
 function reset(){token++;imageData=null;originalCanvas.getContext('2d').clearRect(0,0,S,S);for(const c of [originalCanvas,beforeCanvas])clearCanvas(c);dropResult();$('analyze').disabled=true;$('photo').value='';$('sample').value='';status('یک تصویر محلی برای شروع انتخاب کنید.');$('metrics').textContent='Ready';}
 $('clear').addEventListener('click',reset);reset();
+async function prepareOffline(){
+ const button=$('prepareOffline');button.disabled=true;
+ status('در حال ذخیره کردن مدل‌های محلی و بررسی فایل‌های آفلاین...');
+ try{
+  if(!('serviceWorker' in navigator))throw Error('Service worker unsupported in this browser');
+  await navigator.serviceWorker.register('../../sw.js',{scope:'../../'});
+  await navigator.serviceWorker.ready;
+  if(!navigator.serviceWorker.controller){
+   await new Promise((resolve,reject)=>{
+    const timeout=setTimeout(()=>reject(Error('Offline cache controller not installed')),30000);
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{clearTimeout(timeout);resolve()},{once:true});
+   });
+  }
+  const manifestResponse=await fetch('./model-manifest.json');
+  if(!manifestResponse.ok)throw Error('Model manifest unavailable');
+  const manifest=await manifestResponse.json();
+  const assets=['./hair-removal-studio.html','./hair-removal-core.mjs','./ort/ort.min.js',
+   '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
+   '../models/hair_segmenter.tflite','../models/blaze_face_short_range.tflite',
+   '../wasm/vision_wasm_internal.js','../wasm/vision_wasm_internal.wasm',
+   '../wasm/vision_wasm_nosimd_internal.js','../wasm/vision_wasm_nosimd_internal.wasm',
+   ...manifest.parts.map(p=>'./parts/'+p.name),
+   ...manifest.runtimeFiles.map(p=>'./ort/'+p)];
+  for(const asset of assets){
+   const response=await fetch(asset);
+   if(!response.ok)throw Error('Offline asset missing: '+asset);
+   await response.arrayBuffer();
+  }
+  const names=(await caches.keys()).filter(x=>x.startsWith('hananeh-static-'));
+  if(names.length!==1)throw Error('Unexpected offline cache version count');
+  const cache=await caches.open(names[0]);
+  for(const asset of ['./model-manifest.json',...assets]){
+   const url=new URL(asset,location.href);
+   if(!(await cache.match(url.href)))throw Error('Asset did not enter offline cache: '+asset);
+  }
+  status('بستهٔ آفلاین کامل شد. پس از این می‌توان مدل را بدون اینترنت اجرا کرد.');
+  window.__hananehOfflineReady=true;
+ }catch(error){status('بستهٔ آفلاین ناقص است: '+error.message,true);window.__hananehOfflineReady=false;}
+ finally{button.disabled=false;}
+}
+$('prepareOffline').addEventListener('click',prepareOffline);
 async function loadLocalImage(src){
  const key=++token;dropResult();
  const img=new Image();img.decoding='async';

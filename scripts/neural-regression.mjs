@@ -100,3 +100,22 @@ test('The actual offline production bundle contains verified MI-GAN weights and 
  for(const p of ['runtime/ort.wasm.min.mjs','runtime/ort-wasm-simd-threaded.mjs','runtime/ort-wasm-simd-threaded.wasm'])
   assert.ok(fs.statSync(new URL(p,root)).size>1000,'Missing local ONNX runtime: '+p);
 });
+
+test('Neural restoration rejects a removal mask cut off by the crop edge',()=>{
+ const w=128,h=128,n=w*h;
+ const original=new Uint8ClampedArray(n*4),projected=new Uint8ClampedArray(n*4),
+  guard=new Uint8Array(n);
+ for(let y=1;y<60;y++)for(let x=20;x<65;x++)original[(y*w+x)*4]=255;
+ const out=buildNeuralEraseMask(original,projected,guard,w,h);
+ assert.equal(out.eligible,false);
+ assert.equal(out.reason,'crop-boundary');
+});
+test('Interior neural removal regions remain eligible when otherwise valid',()=>{
+ const w=128,h=128,n=w*h;
+ const original=new Uint8ClampedArray(n*4),projected=new Uint8ClampedArray(n*4),
+  guard=new Uint8Array(n);
+ for(let y=30;y<70;y++)for(let x=25;x<60;x++)original[(y*w+x)*4]=255;
+ const out=buildNeuralEraseMask(original,projected,guard,w,h);
+ assert.equal(out.eligible,true);
+ assert.ok(out.coverage>100);
+});

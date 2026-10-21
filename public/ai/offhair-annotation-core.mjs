@@ -122,7 +122,7 @@ export function evaluateZones(predicted,groundTruth,width,height,{excludeUncerta
     precision:tp+fp?tp/(tp+fp):null};
  }
  for(let i=0;i<n;i++){
-  const gt=groundTruth[i];
+  const gt=groundTruth[i],pred=predicted[i];
   if(!gt||(excludeUncertain&&(gt&CLASS_BITS.uncertain))){ignored++;continue;}
   if(gt&CLASS_BITS.protectedCore){
    knownCore++;

@@ -1,0 +1,175 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f0e8"><title>OffHair Research | Ground-Truth Annotation Lab</title>
+<style>
+:root{--bg:#f3efe8;--paper:#fffefb;--ink:#202d2d;--muted:#6d7776;--teal:#14786b;--line:#dcded7;--shadow:0 14px 50px #162b2510}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 system-ui,-apple-system,Segoe UI,sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #238c79;outline-offset:2px}
+.page{max-width:1200px;margin:auto;padding:22px clamp(12px,3vw,30px) 64px}
+.top{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-bottom:14px}
+.brand{font-size:12px;letter-spacing:.15em;font-weight:750;color:var(--teal)}
+.tag{border:1px solid #caab70;border-radius:999px;padding:3px 12px;color:#7a5b20;font-size:11px;background:#fbf3de}
+h1{font-size:clamp(26px,4vw,42px);letter-spacing:-.055em;line-height:1.15;margin:12px 0}
+.intro{color:var(--muted);max-width:740px}.layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(290px,.75fr);gap:17px;align-items:start;margin-top:20px}
+.panel{border:1px solid var(--line);border-radius:18px;background:var(--paper);box-shadow:var(--shadow);padding:17px}
+h2{font-size:15px;margin:0 0 12px}small,.muted{color:var(--muted)}.stack{display:grid;gap:11px}
+.field{display:grid;gap:4px}.field>span{font-size:12px;color:var(--muted)}input[type=text],select,input[type=file]{width:100%;border:1px solid var(--line);border-radius:9px;background:white;padding:9px 11px;min-height:41px;color:var(--ink)}
+.hint{font-size:12px;color:#81512d;background:#fff3e3;border:1px solid #efdbbc;padding:9px 11px;border-radius:9px}
+.canvas-shell{position:relative;max-width:650px;margin:0 auto;background:#e7e3db;border-radius:12px;overflow:hidden;aspect-ratio:1/1;touch-action:none}
+.canvas-shell canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#overlay{touch-action:none;cursor:crosshair}.canvas-foot{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:11px;margin-top:8px;flex-wrap:wrap}
+.swatches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.swatch{display:flex;align-items:center;gap:9px;text-align:left;min-height:46px;padding:8px 9px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.swatch[aria-pressed=true]{outline:2px solid #146f62;outline-offset:0;background:#edf7f3}
+.dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:0;padding:11px 14px;border-radius:10px;font-weight:700;color:white;background:#173b37}
+.btn.secondary{color:var(--ink);background:#e9eae6}.btn:disabled{opacity:.44;cursor:not-allowed}
+.metric{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.metric>div{padding:10px;background:#f3f6f2;border-radius:10px}.metric strong{display:block;font-size:19px}
+#status{font-size:12px;min-height:35px;color:#174f43}#status.error{color:#9d342c}
+.line{border:0;border-top:1px solid var(--line);margin:14px 0}input[type=range]{flex:1;accent-color:#14786b;min-width:100px}
+kbd{background:#f1eee7;padding:2px 5px;border-radius:4px;font-size:11px}
+@media(max-width:760px){.layout{grid-template-columns:1fr}.panel{padding:13px}.top{margin-bottom:10px}.swatches{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style></head><body><main class="page">
+<div class="top"><a href="../index.html">← Hananeh Beauty</a><span class="brand">OFFHAIR / RESEARCH LAB</span><span class="tag">Metadata-only · Research prototype</span></div>
+<h1>Ground-truth portrait annotation</h1>
+<p class="intro">Mark immutable facial features, potentially occludable forehead, target hair, and reconstruction zones. All drawing happens on this device. This is an annotation aid—not a trained hairstyle transfer engine or approved research dataset.</p>
+<div class="layout">
+<section class="panel stack" aria-label="Annotation workspace">
+<div class="row"><label class="field" style="flex:1;min-width:190px"><span>Select local consented photo</span><input id="photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+<label class="field" style="flex:1;min-width:180px"><span>Optional bundled demo image</span><select id="sample"><option value="">No catalog demo</option><option value="1">Catalog sample 01</option><option value="2">Catalog sample 02</option><option value="3">Catalog sample 03</option></select></label></div>
+<div class="hint">Bundled catalog images are for UI demonstration only; their presence in the app does not establish research/training rights. No photographs are included in annotation JSON exports.</div>
+<div class="canvas-shell"><canvas id="portrait" width="512" height="512" aria-label="Local portrait"></canvas><canvas id="overlay" width="512" height="512" aria-label="Draw annotation labels here"></canvas></div>
+<div class="canvas-foot"><span>512 × 512 normalized view · Bitplanes can overlap</span><span>Touch / mouse · Drag to paint</span></div>
+<div class="row"><button id="undo" class="btn secondary" disabled>Undo stroke</button>
+<button id="clear" class="btn secondary" disabled>Clear labels</button><button id="save" class="btn" disabled>Export annotation JSON</button></div>
+<p id="status" role="status" aria-live="polite">Load a local image to start.</p>
+</section>
+<aside class="stack">
+<section class="panel stack"><h2>01 / Annotation layers</h2>
+<div class="swatches" id="swatches">
+<button class="swatch" data-bit="1" aria-pressed="true"><span class="dot" style="background:#df5248"></span>Protected face core</button>
+<button class="swatch" data-bit="2" aria-pressed="false"><span class="dot" style="background:#d6a42c"></span>Occludable forehead</button>
+<button class="swatch" data-bit="4" aria-pressed="false"><span class="dot" style="background:#418fcb"></span>Target hair region</button>
+<button class="swatch" data-bit="8" aria-pressed="false"><span class="dot" style="background:#9366bd"></span>Scalp reconstruction</button>
+<button class="swatch" data-bit="16" aria-pressed="false"><span class="dot" style="background:#6b7777"></span>Uncertain / don't score</button>
+<button class="swatch" data-bit="0" aria-pressed="false"><span class="dot" style="background:transparent;border:2px solid #888"></span>Erase all layers</button>
+</div><div class="row"><label for="brush">Brush radius</label><input id="brush" type="range" min="2" max="34" value="12"><output id="radius">12 px</output></div>
+<p class="muted" style="font-size:12px">Drawing on one layer leaves other layers intact. An uncertain pixel is excluded from evaluation. Never infer annotation correctness from a browser test.</p>
+</section>
+<section class="panel stack"><h2>02 / Provenance record</h2>
+<label class="field"><span>Pseudonymous portrait subject ID</span><input id="subject" type="text" placeholder="subject-001" required></label>
+<label class="field"><span>Independent annotator ID</span><input id="annotator" type="text" placeholder="annotator-001" required></label>
+<label class="field"><span>Consent receipt ID (externally checked)</span><input id="consent" type="text" placeholder="consent-001" required></label>
+<label class="field"><span>Rights receipt ID (externally checked)</span><input id="rights" type="text" placeholder="rights-001" required></label>
+<label class="field"><span>Study split</span><select id="split"><option value="pilot">Pilot / exploratory</option><option value="train">Train</option><option value="validation">Validation</option><option value="test">Held-out test</option></select></label>
+<label class="row" style="font-size:12px"><input id="ack" type="checkbox"> I recorded IDs, but understand this tool cannot verify the associated legal permissions.</label>
+<div class="hint">Every export remains <strong>not approved for training</strong> until a separate human/institutional review verifies consent, licensing, annotations and subject-disjoint splits.</div></section>
+<section class="panel stack"><h2>03 / Annotation coverage</h2><div class="metric"><div>Annotated pixels<strong id="annotated">0</strong></div><div>Overlapping layers<strong id="overlaps">0</strong></div></div>
+<p class="muted" style="font-size:12px">For scientific evaluation, collect at least two independent annotations per subject and adjudicate disagreements before freezing a held-out test set.</p></section>
+</aside></div>
+</main>
+<script src="../data/pack-01.js"></script>
+<script type="module">
+import {CLASS_BITS,makeAnnotation,annotationCoverage} from '../ai/offhair-annotation-core.mjs';
+const S=512,N=S*S,$=id=>document.getElementById(id),portrait=$('portrait'),
+ overlay=$('overlay'),ctx=portrait.getContext('2d',{willReadFrequently:true}),pen=overlay.getContext('2d',{willReadFrequently:true});
+const COLORS={1:[223,82,72],2:[214,164,44],4:[65,143,203],8:[147,102,189],16:[107,119,119]};
+let mask=new Uint8Array(N),selected=1,brushRadius=12,loaded=false,painting=false,history=[],hash='',sampleOrigin='local_portrait',counter=0;
+const setStatus=(message,isError=false)=>{$('status').textContent=message;$('status').className=isError?'error':''};
+function reset(){painting=false;history=[];mask.fill(0);render();$('undo').disabled=true;$('clear').disabled=!loaded;$('save').disabled=!loaded;}
+function render(){
+ const rgba=new ImageData(S,S),d=rgba.data;
+ for(let i=0;i<N;i++){
+  const bits=mask[i];if(!bits)continue;
+  let r=0,g=0,b=0,colors=0;
+  for(const [bit,color] of Object.entries(COLORS))if(bits&Number(bit)){r+=color[0];g+=color[1];b+=color[2];colors++;}
+  const p=i*4;d[p]=Math.round(r/colors);d[p+1]=Math.round(g/colors);d[p+2]=Math.round(b/colors);d[p+3]=160;
+ }
+ pen.putImageData(rgba,0,0);
+ const coverage=annotationCoverage(mask,S,S);
+ $('annotated').textContent=coverage.annotatedPixels.toLocaleString();
+ $('overlaps').textContent=coverage.overlappingLabels.toLocaleString();
+ $('save').disabled=!loaded||coverage.annotatedPixels===0;
+}
+function stamp(x,y){
+ const radius=brushRadius,rr=radius*radius;
+ for(let yy=Math.max(0,Math.floor(y-radius));yy<Math.min(S,Math.ceil(y+radius));yy++)
+  for(let xx=Math.max(0,Math.floor(x-radius));xx<Math.min(S,Math.ceil(x+radius));xx++)
+   if((xx-x)**2+(yy-y)**2<=rr){
+    const i=yy*S+xx;
+    if(selected===0)mask[i]=0;
+    else mask[i]|=selected;
+   }
+}
+function point(e){
+ const rect=overlay.getBoundingClientRect();
+ return {x:(e.clientX-rect.left)*S/rect.width,y:(e.clientY-rect.top)*S/rect.height};
+}
+overlay.addEventListener('pointerdown',e=>{
+ if(!loaded)return;e.preventDefault();overlay.setPointerCapture(e.pointerId);
+ painting=true;history.push(mask.slice());if(history.length>8)history.shift();
+ $('undo').disabled=false;
+ const p=point(e);stamp(p.x,p.y);render();
+});
+overlay.addEventListener('pointermove',e=>{
+ if(!painting||!loaded)return;e.preventDefault();const p=point(e);stamp(p.x,p.y);render();
+});
+for(const event of ['pointerup','pointercancel','lostpointercapture'])
+ overlay.addEventListener(event,()=>{painting=false;});
+$('swatches').addEventListener('click',e=>{
+ const btn=e.target.closest('[data-bit]');if(!btn)return;
+ selected=Number(btn.dataset.bit);
+ for(const item of $('swatches').querySelectorAll('[data-bit]'))
+  item.setAttribute('aria-pressed',String(item===btn));
+});
+$('brush').addEventListener('input',e=>{brushRadius=Number(e.target.value);$('radius').textContent=brushRadius+' px';});
+$('undo').addEventListener('click',()=>{
+ if(!history.length)return;mask=history.pop();render();$('undo').disabled=history.length===0;
+});
+$('clear').addEventListener('click',()=>{reset();setStatus('Labels cleared; original image remains local.');});
+async function loadImage(src,origin){
+ loaded=false;reset();const img=new Image();img.decoding='async';img.src=src;
+ try{await img.decode();if(img.naturalWidth<64||img.naturalHeight<64)throw Error('Image resolution too small');
+  ctx.fillStyle='#e8e2d8';ctx.fillRect(0,0,S,S);
+  const scale=Math.min(S/img.naturalWidth,S/img.naturalHeight);
+  ctx.drawImage(img,(S-img.naturalWidth*scale)/2,(S-img.naturalHeight*scale)/2,
+   img.naturalWidth*scale,img.naturalHeight*scale);
+  const bytes=ctx.getImageData(0,0,S,S).data;
+  const sha=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+  hash=Array.from(sha,x=>x.toString(16).padStart(2,'0')).join('');
+  sampleOrigin=origin;loaded=true;counter++;
+  reset();setStatus('Image loaded locally. Paint ground-truth candidate masks. Portrait SHA256: '+hash.slice(0,12)+'…');
+ }catch(error){loaded=false;reset();setStatus(error.message,true);}
+}
+$('photo').addEventListener('change',async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>15*1024*1024){
+  setStatus('Unsupported image or file above 15 MB',true);return;
+ }
+ const objectUrl=URL.createObjectURL(file);
+ try{await loadImage(objectUrl,'local_portrait');$('sample').value='';}
+ finally{URL.revokeObjectURL(objectUrl);}
+});
+$('sample').addEventListener('change',async e=>{
+ const id=e.target.value,src=window.OFFLINE_IMAGES?.[id];
+ if(!src){setStatus('No bundled sample selected',true);return;}
+ await loadImage(src,'bundled_catalog_demo');$('photo').value='';
+});
+$('save').addEventListener('click',()=>{
+ if(!loaded||!$('ack').checked){setStatus('Review the provenance acknowledgement before exporting.',true);return;}
+ try{
+  const annotation=makeAnnotation({labels:mask,width:S,height:S,portraitSha256:hash,
+   annotationId:'annotation-'+String(counter).padStart(3,'0'),
+   subjectId:$('subject').value.trim(),annotatorId:$('annotator').value.trim(),
+   consentRecordId:$('consent').value.trim(),rightsRecordId:$('rights').value.trim(),
+   annotationTimeUtc:new Date().toISOString(),photoOrigin:sampleOrigin,studySplit:$('split').value});
+  const blob=new Blob([JSON.stringify(annotation,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='offhair-'+annotation.annotationId+'-'+hash.slice(0,8)+'.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  window.__offhairAnnotationLastExport=annotation;
+  setStatus('Local annotation JSON exported, without the portrait. Rights remain unverified.');
+ }catch(error){setStatus(error.message,true);}
+});
+ctx.fillStyle='#e8e2d8';ctx.fillRect(0,0,S,S);render();window.__offhairAnnotationReady=true;
+</script></body></html>

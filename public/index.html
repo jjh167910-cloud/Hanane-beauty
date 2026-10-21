@@ -208,7 +208,7 @@ async function uploadFile(file){if(!file)return;
  // Invalidate the previous portrait immediately, including rejected files.
  // A failed replacement must never leave an old customer's photo or export on screen.
  const upload=++uploadRevision;++inputRevision;
- loadingPhoto=false;userImage=null;userMask=null;faceUser=null;
+ loadingPhoto=false;userImage=null;selfie=null;userMask=null;faceUser=null;
  hasResult=false;referenceLayer=null;faceLayer=null;showBefore=false;previewQueued=false;$('qualityNotice').textContent='یک سلفی واضح و مدل مو انتخاب کنید.';
  $('saveBtn').disabled=true;$('toggleBefore').textContent='نمایش عکس اصلی';
  $('uploadLabel').textContent='انتخاب عکس از گوشی';
@@ -225,10 +225,76 @@ async function uploadFile(file){if(!file)return;
   const photo=document.createElement('canvas');photo.width=PREVIEW_W;photo.height=PREVIEW_H;
   const px=photo.getContext('2d');px.fillStyle='#eee8e0';px.fillRect(0,0,PREVIEW_W,PREVIEW_H);
   const scale=Math.min(PREVIEW_W/img.width,PREVIEW_H/img.height),w=img.width*scale,h=img.height*scale;
-  px.drawImage(img,(PREVIEW_W-w)/2,(PREVIEW_H-h)/2,w,h);userImage=photo;drawUser();$('canvasPlaceholder').style.display='none';$('uploadLabel').textContent='عکس انتخاب شد · برای تعویض لمس کنید';setProgress('عکس انتخاب شد؛ یک مدل مو انتخاب کرده و «ساخت پیش‌نمایش» را بزنید.');updateBtn();}
+  px.drawImage(img,(PREVIEW_W-w)/2,(PREVIEW_H-h)/2,w,h);userImage=photo;selfie=img;drawUser();$('canvasPlaceholder').style.display='none';$('uploadLabel').textContent='عکس انتخاب شد · برای تعویض لمس کنید';setProgress('عکس انتخاب شد؛ یک مدل مو انتخاب کرده و «ساخت پیش‌نمایش» را بزنید.');updateBtn();}
  catch(e){if(upload===uploadRevision)setProgress('امکان باز کردن عکس نبود: '+e.message);}
  finally{if(url)URL.revokeObjectURL(url);if(upload===uploadRevision){loadingPhoto=false;updateBtn();if(userImage&&selected)requestPreview();}}}
-async function save(){if(!hasResult)return;const data=resultCanvas.toDataURL('image/jpeg',.92);if(window.AndroidAI&&window.AndroidAI.saveImage){window.AndroidAI.saveImage(data);setProgress('درخواست ذخیره در گالری گوشی ارسال شد.');}else{const a=document.createElement('a');a.href=data;a.download='hananeh-beauty-tryon.jpg';a.click();setProgress('خروجی برای دانلود آماده شد.');}}
+/**
+ * Render the actual try-on for export even when "before" view is active.
+ * Retain crisp portrait pixels up to 2× working resolution when the uploaded
+ * picture warrants it. The 512px catalog hairstyle cannot gain new detail.
+ */
+function createExportCanvas(){
+ const photoWidth=selfie?.naturalWidth||selfie?.width||0;
+ const photoHeight=selfie?.naturalHeight||selfie?.height||0;
+ const hd=photoWidth>=1200&&photoHeight>=1400;
+ const factor=hd?2:1;
+ const w=PREVIEW_W*factor,h=PREVIEW_H*factor;
+ const output=document.createElement('canvas');output.width=w;output.height=h;
+ const c=output.getContext('2d',{willReadFrequently:false});
+ if(!c)throw Error('Export canvas unavailable');
+ c.fillStyle='#eee8e0';c.fillRect(0,0,w,h);
+ if(selfie){
+  const k=Math.min(w/photoWidth,h/photoHeight);
+  const pw=photoWidth*k,ph=photoHeight*k;
+  c.drawImage(selfie,(w-pw)/2,(h-ph)/2,pw,ph);
+ }else if(userImage)c.drawImage(userImage,0,0,w,h);
+ if(referenceLayer){
+  c.save();
+  c.translate((fitted.x+numeric('xRange'))*factor,(fitted.y+numeric('yRange'))*factor);
+  c.rotate((fitted.rotation||0)+numeric('rotRange')*Math.PI/180);
+  const scale=fitted.s*numeric('scaleRange')/100*factor;
+  c.scale(scale,scale);
+  c.drawImage(referenceLayer,-fitted.refEyeX,-fitted.refEyeY,512,512);
+  c.restore();
+ }
+ if(faceLayer&&$('protectFace').checked){
+  if(factor===2&&selfie&&faceUser&&qualityCore){
+   // Build the face patch from the original portrait, not the low-res preview.
+   try{
+    const patch=document.createElement('canvas');patch.width=w;patch.height=h;
+    const pc=patch.getContext('2d',{willReadFrequently:true});
+    const k=Math.min(w/photoWidth,h/photoHeight);
+    pc.drawImage(selfie,(w-photoWidth*k)/2,(h-photoHeight*k)/2,photoWidth*k,photoHeight*k);
+    const frame=pc.getImageData(0,0,w,h);
+    const alpha=qualityCore.faceProtectionAlpha(w,h,faceUser);
+    for(let i=0;i<alpha.length;i++)frame.data[i*4+3]=alpha[i];
+    pc.putImageData(frame,0,0);
+    c.drawImage(patch,0,0);
+   }catch(error){
+    console.warn('High-resolution face protection unavailable:',error);
+    c.drawImage(faceLayer,0,0,w,h);
+   }
+  }else c.drawImage(faceLayer,0,0,w,h);
+ }
+ return output;
+}
+async function save(){
+ if(!hasResult)return;
+ let data,quality='HD';
+ try{data=createExportCanvas().toDataURL('image/jpeg',.93);}
+ catch(error){
+  console.warn('HD export failed; retrying from the preview:',error);
+  const previous=showBefore;showBefore=false;
+  try{drawResult();data=resultCanvas.toDataURL('image/jpeg',.92);quality='preview';}
+  finally{showBefore=previous;drawResult();}
+ }
+ if(window.AndroidAI&&window.AndroidAI.saveImage){
+  window.AndroidAI.saveImage(data);setProgress('درخواست ذخیره در گالری گوشی ارسال شد.');
+ }else{
+  const a=document.createElement('a');a.href=data;a.download='hananeh-beauty-tryon.jpg';a.click();
+  setProgress(quality==='HD'?'تصویر برای دانلود آماده شد؛ وضوح نهایی تابع کیفیت عکس و بانک مدل مو است.':'خروجی با وضوح پیش‌نمایش برای دانلود آماده شد.');
+ }
+}
 function normalizeFarsi(s){return s.normalize('NFKC').replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').trim().toLowerCase();}
 const cats=[['all','همه'],['bob','باب'],['pixie','پیکسی'],['long','بلند'],['waves','ویو'],['curly','فر'],['updo','شینیون'],['braids','بافت'],['ponytail','دم‌اسبی'],['color','رنگ']];
 function renderChips(){$('chips').innerHTML=cats.map(([key,name])=>`<button class="chip ${key===currentCat?'active':''}" data-cat="${key}">${name}</button>`).join('');}

@@ -66,5 +66,5 @@ test('Reject anatomically inverted nose and mouth without breaking legacy eye an
  ]}]);
  assert.ok(features);
  assert.equal(features.mouthY,undefined);
- assert.equal(features.eyeDistance,.2);
+ assert.ok(Math.abs(features.eyeDistance-.2)<1e-9);
 });

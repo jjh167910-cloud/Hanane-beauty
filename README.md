@@ -86,3 +86,17 @@ The `residual-hair-repair.mjs` module detects hair that remains visible outside 
 The repaired pixels are an offline 384×480 transparent overlay, drawn between the original photograph and the hairstyle, and are included in the photo export. This can reduce distracting hair fragments against plain salon backgrounds but does **not** solve long-to-short conversions, hair geometry, specular lighting, or generative transfer. Every preview remains a consultation approximation.
 
 Run `npm test` on the branch to execute the catalog/offline/image/face and residual-hair regression suites; static and pure JavaScript checks were performed during development. Visual accuracy must still be assessed on real portraits before this feature is promoted from a draft pull request to production.
+
+
+## Experimental offline neural inpainting (MI-GAN)
+
+The quality branch optionally uses **MI-GAN**, a small inpainting GAN designed for mobile devices, to reconstruct old hair visible beyond a selected style. This is a real neural background-restoration model, not a painted uniform-color patch. **It does not generate the new hairstyle**: hairstyles still come from the original 512px catalog references.
+
+- Model: `andraniksargsyan/migan`, `migan_pipeline_v2.onnx`, pinned Hugging Face revision `1538c135034b8c535f198d2a3569eaefc0309d5a`, fixed SHA-256 `6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b`.
+- Licensing: MIT code and weights; upstream `Picsart-AI-Research/MI-GAN/LICENSE-WEIGHTS` and mirrored `public/ai/inpaint/LICENSE-WEIGHTS.txt`. ONNX Runtime Web is MIT; include its notices when commercially distributing.
+- Build: `npm test` calls `npm run build`, which assembles local MediaPipe assets, downloads/validates the 28,079,181-byte MI-GAN model, and splits it into three 12-MiB-or-smaller parts for Cloudflare's 25-MiB per-asset limit. The pinned `onnxruntime-web@1.23.2` WASM runtime is copied locally, without CDN references.
+- Offline installation: main salon PWA installs without the neural weight. The user explicitly taps **ذخیره موتور عصبی برای آفلاین** while online; the service worker downloads six optional local files into the version-independent `hananeh-hq-inpaint-model-v1` cache. Use offline after that. No photo files are uploaded.
+- Inference: separate browser Worker, SHA-256 verified model sharding, one WASM thread for compatibility, uint8 CHW `image` and `mask` inputs, output composed only over AI-approved hair pixels. A visible opt-in **ترمیم هوشمند موهای قبلی** runs only when real (non-heuristic) hair and face detection succeeds. Incorrect face coverage, excessive removed hair area, stale photo/style changes and model failures leave the existing preview intact.
+- Known limits: very large old hair, missing scalp/back-of-head and highly detailed lighting/strands may still look artificial; operating on a 512-pixel crop cannot reconstruct unlimited detail. Memory and runtime on Android phones remain **unverified**, and the inference path has **not been proven in a real phone browser**.
+
+**Do not merge the draft PR into `main` or advertise real-world photorealism** before the neural model has successfully loaded and inferred on target Android hardware and blinded visual A/B testing beats the existing app. Cloudflare static assets are only a delivery mechanism, not GPU inference. Do not create a remote photo-processing fallback without user opt-in.

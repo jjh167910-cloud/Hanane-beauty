@@ -109,6 +109,13 @@ export function observationFromFaceAnchor(face,width,height){
  const earBias=((face.earPoints[0].x+face.earPoints[1].x)/2-face.eyeX)/face.eyeSpan;
  if(![noseBias,earBias].every(finite)||Math.abs(noseBias)>.42||Math.abs(earBias)>.78)
  return {ok:false,reason:'observed_geometry_outside_synthetic_training_support',noseBias,earBias};
+ // Synthetic observed features are correlated through one artificial yaw:
+ // noseBias=0.38*yaw +/-0.01, earBias=0.8*yaw +/-0.035.
+ // Exploratory joint-domain gate, with tolerance above nominal simulation noise.
+ const jointResidual=earBias-(.8/.38)*noseBias;
+ if(Math.abs(jointResidual)>.13)return {ok:false,
+  reason:'joint_nose_ear_signature_outside_synthetic_training_distribution',
+  noseBias,earBias,jointResidual,syntheticOnly:true};
  return {ok:true,source:'MediaPipe_2D_landmarks',noseBias,earBias,
   frame:{cx:face.eyeX*width,cy:face.eyeY*height,
    scale:face.eyeSpan*width,roll:face.eyeRollRadians},

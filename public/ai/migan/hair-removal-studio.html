@@ -164,10 +164,20 @@ async function inpaint(){
   const output=pred[session.outputNames[0]];
   if(output.type!=='uint8'||output.dims.join(',')!=='1,3,512,512')throw Error('Unexpected neural tensor');
   const composite=composeInpaintedRGBA(imageData.data,output.data,proposal.keepMask,S,S);
+  let outsideMaskChangedPixels=0;
+  for(let i=0;i<N;i++){
+   if(proposal.keepMask[i]===0)continue;
+   const p=i*4;
+   if(composite.rgba[p]!==imageData.data[p]||composite.rgba[p+1]!==imageData.data[p+1]||
+      composite.rgba[p+2]!==imageData.data[p+2]||composite.rgba[p+3]!==imageData.data[p+3])
+      outsideMaskChangedPixels++;
+  }
+  if(outsideMaskChangedPixels!==0)throw Error('Outside-mask portrait integrity violation');
   afterCanvas.getContext('2d').putImageData(new ImageData(composite.rgba,S,S),0,0);
   $('download').disabled=false;status('بازسازی عصبی آفلاین انجام شد. این تصویر، انتقال مدل موی جدید نیست.');
   const proof={realSegmentation:true,realInpainting:true,generatedHair:false,
     removedPixels:proposal.hairPixels,changedChannels:composite.changedChannels,
+    outsideMaskChangedPixels,
     inferenceMs:Math.round(performance.now()-t),totalMs:Math.round(performance.now()-start),
     faceOutsideMaskPreserved:true,crossOriginIsolated:self.crossOriginIsolated,
     model:'MI-GAN 512',privacy:'no customer image uploaded'};

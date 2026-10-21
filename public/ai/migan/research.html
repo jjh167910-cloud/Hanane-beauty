@@ -59,14 +59,16 @@ async function infer(){
   if(inputNames.length===2){
    const imgName=inputNames.find(n=>/image|input/i.test(n))||inputNames[0];
    const maskName=inputNames.find(n=>n!==imgName);
-   const rgb=new Float32Array(CHW*3),keepMask=new Float32Array(CHW);
+   const rgb=new Uint8Array(CHW*3),keepMask=new Uint8Array(CHW);
    for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
-    const i=y*SIZE+x,p=4*i,keep=maskAt(x,y)?0:1;
+    const i=y*SIZE+x,p=4*i,keep=maskAt(x,y)?0:255;
     keepMask[i]=keep;
-    for(let c=0;c<3;c++)rgb[c*CHW+i]=(source.data[p+c]/127.5-1)*keep;
+    for(let c=0;c<3;c++)rgb[c*CHW+i]=source.data[p+c];
    }
-   feeds[imgName]=new ort.Tensor('float32',rgb,[1,3,SIZE,SIZE]);
-   feeds[maskName]=new ort.Tensor('float32',keepMask,[1,1,SIZE,SIZE]);
+   // MI-GAN ONNX pipeline: uint8 image [1,3,H,W], mask [1,1,H,W];
+   // 0 means remove/inpaint; 255 means known/keep.
+   feeds[imgName]=new ort.Tensor('uint8',rgb,[1,3,SIZE,SIZE]);
+   feeds[maskName]=new ort.Tensor('uint8',keepMask,[1,1,SIZE,SIZE]);
   }else if(inputNames.length===1){
    const inputs=new Float32Array(CHW*4);
    for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
@@ -83,7 +85,9 @@ async function infer(){
   const output=out[session.outputNames[0]];
   const pixels=output.data;
   if(output.dims.join(',')!=='1,3,512,512'||pixels.length!==CHW*3)throw Error('Invalid network output shape');
-  const result=new Uint8ClampedArray(source.data),bounded=n=>Math.max(0,Math.min(255,Math.round(n*127.5+127.5)));
+  const result=new Uint8ClampedArray(source.data);
+  if(output.type!=='uint8'&&output.type!=='float32')throw Error('Unsupported network output type: '+output.type);
+  const bounded=n=>output.type==='uint8'?n:Math.max(0,Math.min(255,Math.round(n*127.5+127.5)));
   let changed=0,finite=0;
   for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
    const i=y*SIZE+x,p=i*4;
@@ -98,7 +102,7 @@ async function infer(){
   const measures={model:'MI-GAN ONNX',onDevice:true,pixelsGenerated:finite,
    changedChannels:changed,loadAndVerifyMs:Math.round(inferStart-buildStart),
    inferenceMs:Math.round(performance.now()-inferStart),crossOriginIsolated:self.crossOriginIsolated,
-   architecture:'single-pass mobile GAN inpainting',inputNames,referenceHairstyleTransfer:false};
+   architecture:'single-pass mobile GAN inpainting',inputNames,outputType:output.type,referenceHairstyleTransfer:false};
   $('metrics').textContent=JSON.stringify(measures,null,2);
   $('status').textContent='استنتاج واقعی روی همین مرورگر انجام شد؛ این فقط آزمون بازسازی ناحیه حذف است.';
   $('download').disabled=false;self.__miganTest=measures;

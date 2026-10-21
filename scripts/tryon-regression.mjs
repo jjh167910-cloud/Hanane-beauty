@@ -181,3 +181,32 @@ test('Dragging a style clears stale repair pixels before the next frame',()=>{
  handlers.pointermove({clientX:102,clientY:122,pointerId:1});
  assert.equal(a.run('repairLayer'),null);
 });
+
+test('Neural repair is composited between the real portrait and selected hairstyle',()=>{
+ const a=app();
+ a.scope.photo={kind:'customer'};a.scope.smart={kind:'neural'};a.scope.hair={kind:'hairstyle'};
+ a.run("userImage=photo;neuralLayer=smart;repairLayer={kind:'basic'};referenceLayer=hair;faceLayer=null;fitted={x:300,y:250,s:1,refEyeX:200,refEyeY:150,rotation:0};$('repairHair').checked=true;['scaleRange','xRange','yRange','rotRange'].forEach((id,i)=>$(id).value=i===0?100:0);drawResult()");
+ const order=a.draws.map(d=>d[0]);
+ assert.ok(order.indexOf(a.scope.smart)>order.indexOf(a.scope.photo));
+ assert.ok(order.indexOf(a.scope.hair)>order.indexOf(a.scope.smart));
+ assert.equal(order.some(d=>d.kind==='basic'),false);
+});
+test('Replacing the portrait invalidates neural results and prohibits stale export',async()=>{
+ const a=app();
+ a.run("neuralLayer={id:'oldClient'};hasResult=true;userImage={};$('saveBtn').disabled=false");
+ await a.run("uploadFile({type:'text/plain',name:'bad.txt',size:100})");
+ assert.equal(a.run('neuralLayer'),null);
+ assert.equal(a.elements.get('saveBtn').disabled,true);
+});
+test('Stylist controls invalidate neural reconstruction when head placement changes',()=>{
+ const a=app();
+ a.run("userImage={};selected={id:1};hasResult=true;neuralLayer={id:'old'};repairLayer=null;qualityCore=null;userMask={estimated:true};referenceMask={estimated:true};$('scaleRange').value=100;resetControls()");
+ assert.equal(a.run('neuralLayer'),null);
+});
+test('Neural readiness never enables inference with uncertain segmentation',()=>{
+ const a=app();
+ a.run("neuralInstalled=true;hasResult=true;userMask={estimated:true};referenceMask={estimated:false};faceUser={eyeX:.5,eyeY:.4,eyeDistance:.2};updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,true);
+ a.run("userMask={estimated:false};updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,false);
+});

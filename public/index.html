@@ -52,8 +52,9 @@ const neuralPending=new Map();
 function neuralMessage(message){$('neuralStatus').textContent=message;}
 function updateNeuralButtons(){
  $('neuralInstall').disabled=neuralBusy||neuralInstalled;
+ const mismatched=!!qualityCore?.poseCompatibility?.(faceUser,faceRef)?.mismatch;
  $('neuralRun').disabled=neuralBusy||!neuralInstalled||!hasResult||!faceUser||
-   !userMask||!referenceMask||userMask.estimated||referenceMask.estimated;
+   !userMask||!referenceMask||userMask.estimated||referenceMask.estimated||mismatched;
 }
 function postHQ(type){
  if(!('serviceWorker' in navigator)){neuralMessage('این مرورگر حافظه آفلاین مورد نیاز را پشتیبانی نمی‌کند.');return;}
@@ -196,7 +197,8 @@ function refreshVisualQuality(){
  }catch(e){console.warn('Hair exposure metric unavailable:',e);}
  // Never synthesize an unrecognized person's background. Face guidance, an
  // actual hair model and uniform surrounding color are all required.
- if(masks&&faceUser&&repairCore&&$('repairHair').checked){
+ if(masks&&faceUser&&repairCore&&$('repairHair').checked&&
+    !qualityCore.poseCompatibility(faceUser,faceRef).mismatch){
   try{
    const photo=document.createElement('canvas');photo.width=masks.w;photo.height=masks.h;
    const x=photo.getContext('2d',{willReadFrequently:true});
@@ -220,7 +222,10 @@ function refreshVisualQuality(){
 }
 function updateQualityNotice(report){
  const note=$('qualityNotice');
- if(userMask?.estimated||referenceMask?.estimated){
+ const pose=qualityCore?.poseCompatibility?.(faceUser,faceRef);
+ if(pose?.mismatch){
+  note.textContent='زاویهٔ چهره شما و تصویر مرجع متفاوت است. برای طبیعی‌ترین نتیجه یک عکس روبه‌رو و مدل نزدیک به همان زاویه انتخاب کنید؛ ترمیم عصبی این ترکیب غیرفعال است.';
+ }else if(userMask?.estimated||referenceMask?.estimated){
   note.textContent='تشخیص موی هوش مصنوعی برای این عکس کامل نبود. پیش‌نمایش تقریبی است و موهای قبلی ممکن است دیده شوند.';
  }else if(report?.reliable&&report.fraction>=.33){
   note.textContent='هشدار: بخش زیادی از موهای فعلی زیر استایل جدید پوشانده نمی‌شود. این نتیجه برای تصمیم نهایی درباره کوتاهی مو قابل اعتماد نیست.';
@@ -322,6 +327,8 @@ async function runNeuralHairRepair(){
  try{
   if(!qualityCore||!faceUser||userMask?.estimated||referenceMask?.estimated)
    throw Error('برای بازسازی عصبی، ابتدا عکس چهره و مو با AI شناسایی شوند');
+  if(qualityCore.poseCompatibility(faceUser,faceRef).mismatch)
+   throw Error('زاویهٔ چهره با مدل مرجع متفاوت است. لطفاً تصویر هم‌زاویه انتخاب کنید');
   const core=await import('./ai/neural-inpaint-core.mjs');
   if(ticket!==neuralTicket())return;
   const stage=createNeuralStage(core);

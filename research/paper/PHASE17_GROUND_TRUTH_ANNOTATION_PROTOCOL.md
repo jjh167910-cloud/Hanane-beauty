@@ -42,3 +42,9 @@ Mask-layer IoU, recall and precision on evaluable, non-uncertain pixels, with nu
 
 ## Reproduction
 `npm run build && npm run test:unit`; GitHub research CI browser acceptance produces a demonstration-only screenshot and a metadata evidence JSON. It does not perform training or evaluate real human-labeled ground truth.
+
+## Independent annotation comparison
+- `scripts/offhair-annotation-agreement.mjs`: compares two separately exported metadata-only annotations for **the same 512×512 normalized portrait SHA-256, subject and study split**, with distinct annotator and annotation IDs. Refuses mismatched sources and a single annotator passed as two reviewers. Per-layer IoU and Dice are reported, with unknown/uncertain pixel counts and explicit discrepancies.
+- `scripts/offhair-annotation-agreement-regression.mjs`: checks perfect agreement, disagreements, unknown regions, image-hash mismatch and same-rater rejection.
+- CLI: `npm run research:annotation:compare -- first.json second.json`.
+- This is **only a candidate-mask consistency measure**. It does not verify the ground truth of a target haircut, participant consent, identity correctness, legal permission or authentic annotator independence. Actual sign-off must be recorded by authorized humans outside this tool.

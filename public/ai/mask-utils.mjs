@@ -29,5 +29,9 @@ export function faceAnchor(detections){
  if(eyeDistance<.045||eyeDistance>.5)return null;
  const eyeX=(a.x+b.x)/2,eyeY=(a.y+b.y)/2;
  if(eyeX<0||eyeX>1||eyeY<0||eyeY>1)return null;
- return {eyeX,eyeY,eyeDistance};
+ // Preserve legacy horizontal eyeDistance for current try-on positioning.
+ // Additional geometry is research-only; nonrigid yaw is NOT recovered by roll.
+ const dx=b.x-a.x,dy=b.y-a.y;
+ return {eyeX,eyeY,eyeDistance,eyeSpan:Math.hypot(dx,dy),
+   eyeRollRadians:Math.atan2(dy,dx)};
 }

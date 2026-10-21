@@ -12,7 +12,7 @@ function app(){
   const document={getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id)},addEventListener(){},createElement:element};
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
   const source=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)][0][1];
-  const scope={document,window:{OFFLINE_CATALOG:[]},Intl,console,URL:{createObjectURL:()=> 'blob:photo',revokeObjectURL(){}},setTimeout,Image:class{}};
+  const scope={document,window:{OFFLINE_CATALOG:[]},Intl,console,URL:{createObjectURL:()=> 'blob:photo',revokeObjectURL(){}},setTimeout,clearTimeout,Image:class{}};
   vm.createContext(scope);vm.runInContext(source,scope);
   return {run:code=>vm.runInContext(code,scope),scope,elements,draws};
 }

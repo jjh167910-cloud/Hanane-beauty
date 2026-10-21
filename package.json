@@ -7,7 +7,7 @@
     "test": "npm run build && npm run test:unit",
     "deploy": "npx wrangler deploy",
     "build": "node scripts/build-ai.mjs",
-    "test:unit": "node scripts/verify.mjs && node --test scripts/tryon-regression.mjs scripts/offline-regression.mjs scripts/ai-regression.mjs && node --test scripts/high-res-regression.mjs && node --test scripts/hair-coverage-regression.mjs && node --test scripts/background-repair-regression.mjs && node --test scripts/isolation-regression.mjs && node --test scripts/hair-removal-core-regression.mjs && node --test scripts/research-evidence-regression.mjs && node --test scripts/offhair-paired-preference-regression.mjs",
+    "test:unit": "node scripts/verify.mjs && node --test scripts/tryon-regression.mjs scripts/offline-regression.mjs scripts/ai-regression.mjs && node --test scripts/high-res-regression.mjs && node --test scripts/hair-coverage-regression.mjs && node --test scripts/background-repair-regression.mjs && node --test scripts/isolation-regression.mjs && node --test scripts/hair-removal-core-regression.mjs && node --test scripts/research-evidence-regression.mjs && node --test scripts/offhair-paired-preference-regression.mjs && node --test scripts/offhair-difference-masks-regression.mjs",
     "build:migan": "node scripts/build-migan-research.mjs",
     "research:validate": "node scripts/research-evidence.mjs validate research/results/offhair-ci-smoke-evidence.json",
     "research:summary": "node scripts/research-evidence.mjs summarize research/results/offhair-ci-smoke-evidence.json",

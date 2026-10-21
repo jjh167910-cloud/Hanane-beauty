@@ -50,7 +50,8 @@ try{
   async function stroke(bit,x,y){
    await page.locator('[data-bit="'+bit+'"]').click();
    await canvas.scrollIntoViewIfNeeded();
-   const box=await canvas.boundingBox();assert.ok(box);
+   const box=await canvas.boundingBox();assert.ok(box&&box.width>=256&&box.height>=256,
+    'Annotation canvas must have non-zero usable dimensions: '+JSON.stringify(box));
    await page.mouse.move(box.x+box.width*x,box.y+box.height*y);
    await page.mouse.down();
    await page.mouse.move(box.x+box.width*(x+.025),box.y+box.height*(y+.018),{steps:5});

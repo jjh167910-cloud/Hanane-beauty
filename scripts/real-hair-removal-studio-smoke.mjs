@@ -121,7 +121,7 @@ try{
  // Study existing bundled salon portraits without uploading them. Fail-closed rejects
  // are counted as useful findings rather than coerced into unsafe scalp hallucinations.
  const benchmarkCases=[{id:pass.id,status:'ok',inferenceMs:result.inferenceMs,
-  outsideMaskChangedPixels:result.outsideMaskChangedPixels??0,
+  outsideMaskChangedPixels:result.outsideMaskChangedPixels,
   sourceHash:imageHashById.get(pass.id),changedChannels:result.changedChannels,removedPixels:result.removedPixels}];
  const multi=[];
  for(const id of ['2','3','6','9']){
@@ -145,7 +145,7 @@ try{
      removedPixels:evidence.removedPixels,changedChannels:evidence.changedChannels,error:evidence.error});
    benchmarkCases.push({id,status:evidence.error?'failed':'ok',
       reason:evidence.error,sourceHash,inferenceMs:evidence.inferenceMs,
-      outsideMaskChangedPixels:evidence.outsideMaskChangedPixels??0,
+      outsideMaskChangedPixels:evidence.outsideMaskChangedPixels,
       removedPixels:evidence.removedPixels,changedChannels:evidence.changedChannels});
    if(!evidence.error)await page.screenshot({path:path.join(root,'ai/migan/catalog-'+id+'-inpainting-evidence.png'),fullPage:true});
  }
@@ -171,12 +171,14 @@ try{
      changed_channels:c.changedChannels,removed_pixels:c.removedPixels}: {},
    ...(c.status==='ok'?{}:{failure_reason:c.reason||'Processing failed'})
  }));
+ for(const c of recorded)if(c.status==='ok')
+   assert.equal(c.metrics.outside_mask_changed_pixels,0,'Face integrity metric missing or nonzero');
  const researchReport={protocol_id:'OFFHAIR-PROTOCOL-2026-10-21-v1',
    study_kind:'engineering_smoke',study_id:'phase13-ci-'+commit.slice(0,12),
    dataset_version:'bundled-catalog-identity-and-rights-not-verified',
    includes_images:false,consent_registry_verified:false,rights_registry_verified:false,
    reviewed_human_ratings:false,records:recorded};
- const output=path.resolve(root,'../../research/results/offhair-ci-smoke-evidence.json');
+ const output=path.resolve(root,'../research/results/offhair-ci-smoke-evidence.json');
  await fs.mkdir(path.dirname(output),{recursive:true});
  await fs.writeFile(output,JSON.stringify(researchReport,null,2)+'\n');
  console.log('OFFHAIR SOURCE-IDENTITY CONSERVATIVE SCIENTIFIC SMOKE EVIDENCE '+JSON.stringify({

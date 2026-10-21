@@ -12,6 +12,7 @@
 <section class="panel notes"><div class="section-title"><div><span class="eyebrow">PRIVATE BY DESIGN</span><h2>حریم خصوصی و کیفیت</h2></div><span class="section-no">03 / 03</span></div><div class="note-grid"><article><span>01</span><b>همه‌چیز روی گوشی</b><p>عکس شما روی همین دستگاه پردازش می‌شود و به سرور ارسال نمی‌شود.</p></article><article><span>02</span><b>پیش‌نمایش تقریبی مدل مو</b><p>این نسخه از هم‌گذاری تصویری تقریبی استفاده می‌کند و موتور تولید تصویر یا مدل هوش مصنوعی مو در آن نصب نشده است.</p></article><article><span>03</span><b>نتیجه قابل تنظیم</b><p>جاگذاری خودکار اولیه همراه با جابه‌جایی، تغییر اندازه و چرخش برای هماهنگی بیشتر.</p></article></div></section>
 </main><nav class="bottomnav"><a href="#tryon"><span>◉</span>امتحان</a><a href="#styles"><span>▦</span>مدل‌ها</a><a href="#top" id="topLink"><span>⌂</span>خانه</a></nav>
 <div class="sheet" id="styleSheet" aria-hidden="true"><div class="sheet-content"><button class="sheet-close" id="sheetClose" type="button" aria-label="بستن">✕</button><img id="sheetImage" alt="نمونه مدل مو" src=""><div class="sheet-body"><span id="sheetCode" class="eyebrow"></span><h3 id="sheetTitle"></h3><p id="sheetDescription"></p><div id="variants" class="variants"></div><button id="selectStyleBtn" class="primary" type="button">امتحان این مدل روی عکس من</button></div></div></div>
+<script src="./ai/high-res-engine.js"></script>
 <script src="./catalog.js"></script>
 <script src="./data/pack-01.js"></script>
 <script src="./data/pack-02.js"></script>
@@ -37,6 +38,8 @@ const categoryNames={all:'همه',pixie:'پیکسی و کوتاه',bob:'باب �
 let catalog=[], filtered=[], selected=null, selectedVariant=0, selfie=null, userMask=null, referenceMask=null;
 let faceUser=null,faceRef=null, showBefore=false, hasResult=false, currentCat='all', search='', countVisible=30;
 let refImage=null,userImage=null,referenceLayer=null, maskBounds=null;
+// Higher-resolution source retained locally for export; preview stays 768x960.
+let exportPhoto=null,exportFactor=1;
 let inputRevision=0,uploadRevision=0;
 let browsingStyle=null,browsingVariant=0;
 let loadingPhoto=false,previewQueued=false;
@@ -143,7 +146,7 @@ async function uploadFile(file){if(!file)return;
  // Invalidate the previous portrait immediately, including rejected files.
  // A failed replacement must never leave an old customer's photo or export on screen.
  const upload=++uploadRevision;++inputRevision;
- loadingPhoto=false;userImage=null;userMask=null;faceUser=null;
+ loadingPhoto=false;userImage=null;userMask=null;faceUser=null;exportPhoto=null;exportFactor=1;
  hasResult=false;referenceLayer=null;showBefore=false;previewQueued=false;
  $('saveBtn').disabled=true;$('toggleBefore').textContent='نمایش عکس اصلی';
  $('uploadLabel').textContent='انتخاب عکس از گوشی';
@@ -160,10 +163,43 @@ async function uploadFile(file){if(!file)return;
   const photo=document.createElement('canvas');photo.width=PREVIEW_W;photo.height=PREVIEW_H;
   const px=photo.getContext('2d');px.fillStyle='#eee8e0';px.fillRect(0,0,PREVIEW_W,PREVIEW_H);
   const scale=Math.min(PREVIEW_W/img.width,PREVIEW_H/img.height),w=img.width*scale,h=img.height*scale;
-  px.drawImage(img,(PREVIEW_W-w)/2,(PREVIEW_H-h)/2,w,h);userImage=photo;drawUser();$('canvasPlaceholder').style.display='none';$('uploadLabel').textContent='عکس انتخاب شد · برای تعویض لمس کنید';setProgress('عکس انتخاب شد؛ یک مدل مو انتخاب کرده و «ساخت پیش‌نمایش» را بزنید.');updateBtn();}
+  px.drawImage(img,(PREVIEW_W-w)/2,(PREVIEW_H-h)/2,w,h);
+  // Retain genuine source detail for the final image, with a strict pixel budget.
+  // Failure to allocate a larger canvas never prevents ordinary offline editing.
+  if(window.HananehExport){
+   try{
+    const factor=window.HananehExport.exportScale(img.width,img.height,PREVIEW_W,PREVIEW_H);
+    if(factor>1.02){
+     const high=document.createElement('canvas');
+     high.width=Math.round(PREVIEW_W*factor);high.height=Math.round(PREVIEW_H*factor);
+     const hx=high.getContext('2d');if(!hx)throw Error('High resolution canvas unavailable');
+     const sx=high.width/PREVIEW_W,sy=high.height/PREVIEW_H;
+     hx.fillStyle='#eee8e0';hx.fillRect(0,0,high.width,high.height);
+     hx.drawImage(img,(PREVIEW_W-w)*sx/2,(PREVIEW_H-h)*sy/2,w*sx,h*sy);
+     exportPhoto=high;exportFactor=sx;
+    }
+   }catch(error){exportPhoto=null;exportFactor=1;console.warn('High-resolution export unavailable:',error);}
+  }
+  userImage=photo;drawUser();$('canvasPlaceholder').style.display='none';$('uploadLabel').textContent='عکس انتخاب شد · برای تعویض لمس کنید';setProgress('عکس انتخاب شد؛ یک مدل مو انتخاب کرده و «ساخت پیش‌نمایش» را بزنید.');updateBtn();}
  catch(e){if(upload===uploadRevision)setProgress('امکان باز کردن عکس نبود: '+e.message);}
  finally{if(url)URL.revokeObjectURL(url);if(upload===uploadRevision){loadingPhoto=false;updateBtn();if(userImage&&selected)requestPreview();}}}
-async function save(){if(!hasResult)return;const data=resultCanvas.toDataURL('image/jpeg',.92);if(window.AndroidAI&&window.AndroidAI.saveImage){window.AndroidAI.saveImage(data);setProgress('درخواست ذخیره در گالری گوشی ارسال شد.');}else{const a=document.createElement('a');a.href=data;a.download='hananeh-beauty-tryon.jpg';a.click();setProgress('خروجی برای دانلود آماده شد.');}}
+async function save(){if(!hasResult)return;
+ try{
+  let output=resultCanvas;
+  if(exportPhoto&&exportFactor>1.02&&window.HananehExport&&referenceLayer){
+   const full=document.createElement('canvas');full.width=exportPhoto.width;full.height=exportPhoto.height;
+   const fc=full.getContext('2d');if(!fc)throw Error('Canvas unavailable');
+   fc.drawImage(exportPhoto,0,0);
+   window.HananehExport.paintHair(fc,referenceLayer,fitted,{
+    x:numeric('xRange'),y:numeric('yRange'),rotation:numeric('rotRange'),scale:numeric('scaleRange')
+   },exportFactor);
+   output=full;
+  }
+  const data=output.toDataURL('image/jpeg',.94);
+  if(window.AndroidAI&&window.AndroidAI.saveImage){window.AndroidAI.saveImage(data);setProgress('درخواست ذخیره در گالری گوشی ارسال شد.');}
+  else{const a=document.createElement('a');a.href=data;a.download='hananeh-beauty-tryon.jpg';a.click();setProgress('خروجی '+output.width+'×'+output.height+' برای دانلود آماده شد.');}
+ }catch(error){setProgress('ذخیره تصویر ممکن نشد: '+error.message);}
+}
 function normalizeFarsi(s){return s.normalize('NFKC').replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').trim().toLowerCase();}
 const cats=[['all','همه'],['bob','باب'],['pixie','پیکسی'],['long','بلند'],['waves','ویو'],['curly','فر'],['updo','شینیون'],['braids','بافت'],['ponytail','دم‌اسبی'],['color','رنگ']];
 function renderChips(){$('chips').innerHTML=cats.map(([key,name])=>`<button class="chip ${key===currentCat?'active':''}" data-cat="${key}">${name}</button>`).join('');}

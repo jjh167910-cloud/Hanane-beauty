@@ -81,3 +81,24 @@ test('Normal service worker activation does not evict the optional neural model'
  assert.ok((await w.keys()).includes('hananeh-hq-inpaint-model-v1'));
  assert.equal((await w.message('HQ_STATUS')).at(-1).ready,true);
 });
+
+test('Direct model URL before explicit installation never downloads a large binary',async()=>{
+ const w=fixture();
+ await w.install();
+ const before=w.requests().length;
+ const response=await w.fetch('/ai/inpaint/model-part-00.bin');
+ assert.equal(response.type,'error');
+ assert.equal(w.requests().length,before,'Missing opt-in must not start a network request');
+ const status=(await w.message('HQ_STATUS')).at(-1);
+ assert.equal(status.ready,false);
+});
+test('Explicitly cached model can be served offline without duplicate network use',async()=>{
+ const w=fixture();await w.install();await w.message('HQ_PREPARE');
+ const before=w.requests().length;
+ w.offline();
+ for(const file of ['model-part-00.bin','model-part-01.bin','model-part-02.bin']){
+  const response=await w.fetch('/ai/inpaint/'+file);
+  assert.equal(response.status,200);
+ }
+ assert.equal(w.requests().length,before);
+});

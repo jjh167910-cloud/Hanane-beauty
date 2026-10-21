@@ -1,0 +1,10 @@
+{
+  "name": "hananeh-beauty-offline-pwa",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/verify.mjs",
+    "deploy": "wrangler deploy"
+  }
+}

@@ -1,15 +1,17 @@
 {
   "name": "hananeh-beauty-offline-pwa",
-  "version": "0.4.1-quality",
+  "version": "0.5.0-quality-prototype",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "npm run build && npm run test:unit",
     "deploy": "npx wrangler deploy",
-    "build": "node scripts/build-ai.mjs",
-    "test:unit": "node scripts/verify.mjs && node --test scripts/tryon-regression.mjs scripts/offline-regression.mjs scripts/ai-regression.mjs scripts/quality-regression.mjs scripts/residual-hair-regression.mjs"
+    "build": "node scripts/build-ai.mjs && node scripts/build-neural-inpaint.mjs",
+    "test:unit": "node scripts/verify.mjs && node --test scripts/tryon-regression.mjs scripts/offline-regression.mjs scripts/ai-regression.mjs scripts/quality-regression.mjs scripts/residual-hair-regression.mjs",
+    "build:neural": "node scripts/build-neural-inpaint.mjs"
   },
   "devDependencies": {
-    "@mediapipe/tasks-vision": "0.10.32"
+    "@mediapipe/tasks-vision": "0.10.32",
+    "onnxruntime-web": "1.23.2"
   }
 }

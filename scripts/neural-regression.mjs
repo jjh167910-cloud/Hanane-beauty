@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import {buildNeuralEraseMask,imageDataToCHW,neuralOutputToRGBA}
  from '../public/ai/neural-inpaint-core.mjs';
 const sample=(width=32,height=32)=>{
@@ -80,4 +81,22 @@ test('Neural worker confines image processing to one local worker and checks mod
  assert.match(code,/executionProviders:\['wasm'\]/);
  assert.match(code,/numThreads=1/);
  assert.doesNotMatch(code,/fetch\(['"]https?:/);
+});
+
+test('The actual offline production bundle contains verified MI-GAN weights and runtime',()=>{
+ const root=new URL('../public/ai/inpaint/',import.meta.url);
+ const shards=['model-part-00.bin','model-part-01.bin','model-part-02.bin'];
+ const buffers=shards.map(p=>{
+  const file=new URL(p,root);
+  assert.ok(fs.existsSync(file),'Missing offline model file: '+p);
+  const data=fs.readFileSync(file);
+  assert.ok(data.length>100000&&data.length<=12*1024*1024,'Invalid shard: '+p);
+  return data;
+ });
+ const model=Buffer.concat(buffers);
+ assert.equal(model.length,28079181);
+ assert.equal(createHash('sha256').update(model).digest('hex'),
+  '6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b');
+ for(const p of ['runtime/ort.wasm.min.mjs','runtime/ort-wasm-simd-threaded.mjs','runtime/ort-wasm-simd-threaded.wasm'])
+  assert.ok(fs.statSync(new URL(p,root)).size>1000,'Missing local ONNX runtime: '+p);
 });

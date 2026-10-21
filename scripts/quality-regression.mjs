@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import fs from 'node:fs';
-import {faceProtectionAlpha, eyeRotation, exposedHairFraction} from '../public/ai/quality-core.mjs';
+import {faceProtectionAlpha, eyeRotation, exposedHairFraction, poseCompatibility} from '../public/ai/quality-core.mjs';
 import {faceAnchor} from '../public/ai/mask-utils.mjs';
 
 test('Central facial features are protected while hair above the forehead stays unprotected',()=>{
@@ -67,4 +67,13 @@ test('Offline quality helper is shipped and precached without external runtime d
  assert.match(html,/import\('\.\/ai\/quality-core\.mjs'\)/);
  assert.match(html,/id="protectFace"/);
  assert.match(html,/id="qualityNotice"/);
+});
+
+test('Head-angle mismatches reject unrealistic frontal/side hair pairing',()=>{
+ assert.deepEqual(poseCompatibility({yaw:.58},{yaw:0}),
+  {known:true,mismatch:true,difference:.58});
+ assert.equal(poseCompatibility({yaw:.12},{yaw:.20}).mismatch,false);
+ const unknown=poseCompatibility({yaw:null},{yaw:.25});
+ assert.equal(unknown.known,false);
+ assert.equal(unknown.mismatch,false);
 });

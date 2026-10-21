@@ -119,3 +119,13 @@ test('Interior neural removal regions remain eligible when otherwise valid',()=>
  assert.equal(out.eligible,true);
  assert.ok(out.coverage>100);
 });
+
+test('Neural inpainting avoids the invisible lower safety-band cutoff on long hair',()=>{
+ const w=128,h=128,n=w*h;
+ const old=new Uint8ClampedArray(n*4),newHair=new Uint8ClampedArray(n*4),
+       guard=new Uint8Array(n);
+ for(let y=30;y<115;y++)for(let x=25;x<80;x++)old[(y*w+x)*4]=255;
+ const output=buildNeuralEraseMask(old,newHair,guard,w,h);
+ assert.equal(output.eligible,false);
+ assert.equal(output.reason,'crop-boundary');
+});

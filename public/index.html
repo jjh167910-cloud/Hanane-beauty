@@ -37,6 +37,8 @@ const categoryNames={all:'همه',pixie:'پیکسی و کوتاه',bob:'باب �
 let catalog=[], filtered=[], selected=null, selectedVariant=0, selfie=null, userMask=null, referenceMask=null;
 let faceUser=null,faceRef=null, showBefore=false, hasResult=false, currentCat='all', search='', countVisible=30;
 let refImage=null,userImage=null,referenceLayer=null, maskBounds=null;
+let inputRevision=0,uploadRevision=0;
+let browsingStyle=null,browsingVariant=0;
 let fitted={x:0,y:0,s:1,eyeX:350,eyeY:350,refEyeX:350,refEyeY:350};
 const PREVIEW_W=768,PREVIEW_H=960;
 const resultCanvas=$('resultCanvas'),ctx=resultCanvas.getContext('2d',{willReadFrequently:true});
@@ -94,21 +96,32 @@ function fitTransform(){const u=maskBox(userMask.mask),r=maskBox(referenceMask.m
  }
  fitted={x:ux,y:uy,s:Math.max(.55,Math.min(2.7,s)),refEyeX:rx,refEyeY:ry};
 }
-async function generate(){if(busy||!userImage||!selected)return;busy=true;updateBtn();setProgress('در حال پردازش تصویر روی همین دستگاه...');showBefore=false;
+async function generate(){if(busy||!userImage||!selected)return;const revision=inputRevision,photo=userImage,refId=selected.variantIds[selectedVariant];busy=true;hasResult=false;$('saveBtn').disabled=true;updateBtn();setProgress('در حال پردازش تصویر روی همین دستگاه...');showBefore=false;
  try{
-  userMask=await getMask(userImage,'user_'+Date.now());faceUser=userMask.face;
-  const refId=selected.variantIds[selectedVariant];refImage=await loadImage(imgPath(refId,'full'));
-  referenceMask=await getMask(refImage,'ref_'+refId);faceRef=referenceMask.face;
+  const nextUserMask=await getMask(photo,'user_'+revision);if(revision!==inputRevision)return;
+  const nextRefImage=await loadImage(imgPath(refId,'full'));if(revision!==inputRevision)return;
+  const nextReferenceMask=await getMask(nextRefImage,'ref_'+refId);if(revision!==inputRevision)return;
+  userMask=nextUserMask;faceUser=userMask.face;refImage=nextRefImage;referenceMask=nextReferenceMask;faceRef=referenceMask.face;
   referenceLayer=createHairLayer(refImage,referenceMask.mask);fitTransform();
   $('canvasPlaceholder').style.display='none';drawResult();hasResult=true;
   $('saveBtn').disabled=false;
   setProgress(native?'پیش‌نمایش با استخراج AI مو آماده است. در صورت نیاز جایگذاری را تنظیم کنید.':'پیش‌نمایش تقریبی آماده است. این حالت از مدل AI استفاده نمی‌کند.');
- }catch(e){setProgress('امکان ساخت پیش‌نمایش نبود: '+e.message);hasResult=false;}
- busy=false;updateBtn();}
+ }catch(e){if(revision===inputRevision){setProgress('امکان ساخت پیش‌نمایش نبود: '+e.message);hasResult=false;}}
+ finally{busy=false;updateBtn();}}
 async function uploadFile(file){if(!file)return;if(!file.type.startsWith('image/')){setProgress('فقط تصویر قابل قبول است');return;}
  if(file.size>18*1024*1024){setProgress('حجم عکس بیش از ۱۸ مگابایت است');return;}
- try{const url=URL.createObjectURL(file);const img=await loadImage(url);URL.revokeObjectURL(url);userImage=img;hasResult=false;referenceLayer=null;drawUser();$('canvasPlaceholder').style.display='none';$('uploadLabel').textContent='عکس انتخاب شد · برای تعویض لمس کنید';setProgress('عکس انتخاب شد؛ یک مدل مو انتخاب کرده و «ساخت پیش‌نمایش» را بزنید.');updateBtn();}
- catch(e){setProgress('امکان باز کردن عکس نبود: '+e.message);}}
+ const upload=++uploadRevision;++inputRevision;hasResult=false;referenceLayer=null;showBefore=false;$('saveBtn').disabled=true;$('toggleBefore').textContent='نمایش عکس اصلی';
+ let url;
+ try{url=URL.createObjectURL(file);const img=await loadImage(url);if(upload!==uploadRevision)return;
+  // Contain the whole portrait without changing its proportions. A fixed-size
+  // working canvas also bounds retained photo memory and keeps mask coordinates
+  // consistent with preview coordinates.
+  const photo=document.createElement('canvas');photo.width=PREVIEW_W;photo.height=PREVIEW_H;
+  const px=photo.getContext('2d');px.fillStyle='#eee8e0';px.fillRect(0,0,PREVIEW_W,PREVIEW_H);
+  const scale=Math.min(PREVIEW_W/img.width,PREVIEW_H/img.height),w=img.width*scale,h=img.height*scale;
+  px.drawImage(img,(PREVIEW_W-w)/2,(PREVIEW_H-h)/2,w,h);userImage=photo;drawUser();$('canvasPlaceholder').style.display='none';$('uploadLabel').textContent='عکس انتخاب شد · برای تعویض لمس کنید';setProgress('عکس انتخاب شد؛ یک مدل مو انتخاب کرده و «ساخت پیش‌نمایش» را بزنید.');updateBtn();}
+ catch(e){if(upload===uploadRevision)setProgress('امکان باز کردن عکس نبود: '+e.message);}
+ finally{if(url)URL.revokeObjectURL(url);}}
 async function save(){if(!hasResult)return;const data=resultCanvas.toDataURL('image/jpeg',.92);if(window.AndroidAI&&window.AndroidAI.saveImage){window.AndroidAI.saveImage(data);setProgress('درخواست ذخیره در گالری گوشی ارسال شد.');}else{const a=document.createElement('a');a.href=data;a.download='hananeh-beauty-tryon.jpg';a.click();setProgress('خروجی برای دانلود آماده شد.');}}
 function normalizeFarsi(s){return s.normalize('NFKC').replace(/[ي]/g,'ی').replace(/[ك]/g,'ک').trim().toLowerCase();}
 const cats=[['all','همه'],['bob','باب'],['pixie','پیکسی'],['long','بلند'],['waves','ویو'],['curly','فر'],['updo','شینیون'],['braids','بافت'],['ponytail','دم‌اسبی'],['color','رنگ']];
@@ -116,10 +129,10 @@ function renderChips(){$('chips').innerHTML=cats.map(([key,name])=>`<button clas
 function filterStyles(){filtered=catalog.filter(f=>(currentCat==='all'||f.category===currentCat)&&(!search||normalizeFarsi(f.searchText).includes(search)||f.code.toLowerCase().includes(search)));countVisible=30;renderGrid();}
 function renderGrid(){const visible=filtered.slice(0,countVisible);$('count').textContent=`${arNum(filtered.length)} خانواده استایل · ${arNum(catalog.reduce((n,f)=>n+f.variantIds.length,0))} تصویر`;
  $('styleGrid').innerHTML=visible.map(f=>`<button class="style-card" data-id="${f.id}" type="button"><img src="${imgPath(f.variantIds[0])}" loading="lazy" alt="${f.name}"><div class="body"><strong>${f.name}</strong><small>${f.code} · ${arNum(f.variantIds.length)} نمونه</small></div></button>`).join('');$('moreBtn').style.display=countVisible<filtered.length?'block':'none';}
-function openStyle(id){selected=catalog.find(f=>f.id===Number(id));if(!selected)return;selectedVariant=0;paintSheet();$('styleSheet').classList.add('open');$('styleSheet').setAttribute('aria-hidden','false');}
-function paintSheet(){$('sheetImage').src=imgPath(selected.variantIds[selectedVariant],'full');$('sheetTitle').textContent=selected.variantNames[selectedVariant]||selected.name;$('sheetCode').textContent=selected.code;$('sheetDescription').textContent=selected.description||'این مدل به‌عنوان یک استایل مستقل در بانک حنانه بیوتی ثبت شده است.';$('variants').innerHTML=selected.variantIds.map((id,i)=>`<button type="button" class="variant ${i===selectedVariant?'active':''}" data-variant="${i}"><img src="${imgPath(id)}" alt="${selected.variantNames[i]}">${selected.variantNames[i]}</button>`).join('');}
+function openStyle(id){browsingStyle=catalog.find(f=>f.id===Number(id));if(!browsingStyle)return;browsingVariant=0;paintSheet();$('styleSheet').classList.add('open');$('styleSheet').setAttribute('aria-hidden','false');}
+function paintSheet(){$('sheetImage').src=imgPath(browsingStyle.variantIds[browsingVariant],'full');$('sheetTitle').textContent=browsingStyle.variantNames[browsingVariant]||browsingStyle.name;$('sheetCode').textContent=browsingStyle.code;$('sheetDescription').textContent=browsingStyle.description||'این مدل به‌عنوان یک استایل مستقل در بانک حنانه بیوتی ثبت شده است.';$('variants').innerHTML=browsingStyle.variantIds.map((id,i)=>`<button type="button" class="variant ${i===browsingVariant?'active':''}" data-variant="${i}"><img src="${imgPath(id)}" alt="${browsingStyle.variantNames[i]}">${browsingStyle.variantNames[i]}</button>`).join('');}
 function closeSheet(){$('styleSheet').classList.remove('open');$('styleSheet').setAttribute('aria-hidden','true');}
-function chooseStyle(){refImage=null;referenceLayer=null;hasResult=false;$('saveBtn').disabled=true;$('chosenThumb').src=imgPath(selected.variantIds[selectedVariant]);$('chosenThumb').style.display='block';$('chosenTitle').textContent=selected.variantNames[selectedVariant]||selected.name;$('chosenCode').textContent=selected.code;closeSheet();updateBtn();setProgress(userImage?'مدل انتخاب شد. اکنون «ساخت پیش‌نمایش» را بزنید.':'مدل انتخاب شد. حالا عکس خود را اضافه کنید.');document.getElementById('tryon').scrollIntoView({behavior:'smooth'});}
+function chooseStyle(){if(!browsingStyle)return;selected=browsingStyle;selectedVariant=browsingVariant;++inputRevision;refImage=null;referenceLayer=null;hasResult=false;$('saveBtn').disabled=true;$('chosenThumb').src=imgPath(selected.variantIds[selectedVariant]);$('chosenThumb').style.display='block';$('chosenTitle').textContent=selected.variantNames[selectedVariant]||selected.name;$('chosenCode').textContent=selected.code;closeSheet();updateBtn();setProgress(userImage?'مدل انتخاب شد. اکنون «ساخت پیش‌نمایش» را بزنید.':'مدل انتخاب شد. حالا عکس خود را اضافه کنید.');document.getElementById('tryon').scrollIntoView({behavior:'smooth'});}
 function resetControls(){['scaleRange','xRange','yRange','rotRange'].forEach((id,i)=>$(id).value=i===0?100:0);if(hasResult)drawResult();}
 function handleDrag(){let previous=null;resultCanvas.addEventListener('pointerdown',e=>{if(!hasResult)return;previous={x:e.clientX,y:e.clientY};resultCanvas.setPointerCapture(e.pointerId);});resultCanvas.addEventListener('pointermove',e=>{if(!previous)return;const rc=resultCanvas.getBoundingClientRect();const dx=(e.clientX-previous.x)*PREVIEW_W/rc.width;const dy=(e.clientY-previous.y)*PREVIEW_H/rc.height; $('xRange').value=Math.max(-180,Math.min(180,numeric('xRange')+dx));$('yRange').value=Math.max(-180,Math.min(180,numeric('yRange')+dy));previous={x:e.clientX,y:e.clientY};drawResult();});for(const event of ['pointerup','pointercancel'])resultCanvas.addEventListener(event,()=>previous=null);}
 async function init(){try{const r={ok:true,json:async()=>window.OFFLINE_CATALOG};if(!r.ok)throw Error('catalog.json unavailable');catalog=await r.json();renderChips();filterStyles();}catch(e){setProgress('بارگذاری کاتالوگ با مشکل روبه‌رو شد. برنامه را از نسخه نصب‌شده اندروید اجرا کنید.');$('count').textContent='کاتالوگ در دسترس نیست';}}
@@ -134,7 +147,7 @@ $('chips').addEventListener('click',e=>{const t=e.target.closest('[data-cat]');i
 $('styleGrid').addEventListener('click',e=>{const t=e.target.closest('[data-id]');if(t)openStyle(t.dataset.id);});
 $('moreBtn').addEventListener('click',()=>{countVisible+=30;renderGrid();});
 $('sheetClose').addEventListener('click',closeSheet);$('styleSheet').addEventListener('click',e=>{if(e.target===$('styleSheet'))closeSheet();});
-$('variants').addEventListener('click',e=>{const t=e.target.closest('[data-variant]');if(t){selectedVariant=Number(t.dataset.variant);paintSheet();}});
+$('variants').addEventListener('click',e=>{const t=e.target.closest('[data-variant]');if(t){browsingVariant=Number(t.dataset.variant);paintSheet();}});
 $('selectStyleBtn').addEventListener('click',chooseStyle);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});handleDrag();init();
 </script><script>if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('SW unavailable',err)));}</script><script>

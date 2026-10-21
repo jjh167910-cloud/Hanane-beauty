@@ -43,3 +43,12 @@ The connected GitHub repository has the app source and deployment configuration,
 
 ## Verification
 Run `npm test` to validate 265 families, 270 local WebP images, image references, PWA manifest, service-worker cache messaging, and JavaScript syntax. This static test does not prove photorealism, Android performance, or browser cache durability.
+
+## Reliability update — 2026-10-21, v0.3.0
+- Portraits are fitted into a bounded 768 × 960 working canvas without stretching or cropping; empty margins preserve the complete photograph.
+- Changing a photo or confirming a different style invalidates pending output. Export stays disabled until a current result exists.
+- Merely browsing and dismissing another style leaves the chosen style unchanged.
+- The offline cache version is advanced so existing installations can receive the corrected page.
+- `npm test` now runs five try-on regressions and three service-worker integration tests in addition to catalog integrity checks, using Node built-ins only.
+
+This session could not run Chromium browser checks because no browser executable was installed and the browser download failed. The service-worker integration tests run real worker handlers against local app bytes, but do not replace real Android Chrome checks. Cloudflare returned a missing-permissions / reauthentication error while checking deployment; no deployment was created or verified in this session.

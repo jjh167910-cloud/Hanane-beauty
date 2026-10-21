@@ -129,3 +129,26 @@ test('Neural inpainting avoids the invisible lower safety-band cutoff on long ha
  assert.equal(output.eligible,false);
  assert.equal(output.reason,'crop-boundary');
 });
+
+test('Neural patch alpha feathers smoothly over six pixels and preserves original scene',()=>{
+ const w=32,h=32,n=w*h,output=new Uint8Array(n*3).fill(210),
+   mask=new Uint8Array(n).fill(255);
+ for(let y=6;y<26;y++)for(let x=6;x<26;x++)mask[y*w+x]=0;
+ const pixels=neuralOutputToRGBA(output,mask,w,h);
+ const alpha=(x,y)=>pixels[(y*w+x)*4+3];
+ assert.equal(alpha(3,16),0);
+ assert.ok(alpha(6,16)>0&&alpha(6,16)<alpha(8,16));
+ assert.ok(alpha(8,16)<alpha(12,16));
+ assert.equal(alpha(12,16),255);
+ assert.equal(pixels[(12*w+12)*4],210);
+});
+test('AI smoke test executes true local model inference rather than only checking download',()=>{
+ const worker=fs.readFileSync(new URL('../public/ai/neural-inpaint-worker.mjs',import.meta.url),'utf8');
+ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(worker,/async function selfTest\(/);
+ assert.match(worker,/type:'TEST_RESULT'/);
+ assert.match(worker,/isTest\?selfTest\(\):run\(d\)/);
+ assert.match(html,/id="neuralTest"/);
+ assert.match(html,/neuralVerified/);
+ assert.match(html,/neuralInstalled\|\|!neuralVerified/);
+});

@@ -1,0 +1,86 @@
+{
+  "protocol_id": "OFFHAIR-PROTOCOL-2026-10-21-v1",
+  "created_utc": "2026-10-21",
+  "status": "prospective_protocol_not_preregistered_at_external_registry",
+  "publication_tracks": {
+    "systems": "Offline hair-editing deployment reliability and quality-compute trade-offs",
+    "method": "Identity-preserving, reference-conditioned hair synthesis under mobile-browser constraints"
+  },
+  "research_questions": [
+    "RQ1: Can browser-local hair editing achieve faithful reference hairstyle transfer with acceptable real-portrait realism and facial identity preservation?",
+    "RQ2: Which computational trade-offs dominate Android-browser inference latency, peak memory, and offline reliability?",
+    "RQ3: How do head-pose difference, original hairstyle length, and occlusion affect failure rates?"
+  ],
+  "registered_before_confirmatory_data": true,
+  "hypotheses_are_unverified": true,
+  "datasets": {
+    "consent_required": true,
+    "commercial_compatible_data_rights_required": true,
+    "identities_must_be_disjoint_across_splits": true,
+    "same_original_image_must_not_cross_splits": true,
+    "no_training_on_confirmatory_test_images": true,
+    "exclude_faceapp_reverse_engineered_weights": true,
+    "exclude_nc_nd_training_assets_without_permission": true,
+    "pilot": {"target_distinct_people": 30, "target_hairstyle_references": 10, "not_for_significance_claims": true},
+    "confirmatory": {"target_distinct_people": 120, "target_hairstyle_references": 8, "target_pairs": 960, "sample_size_requires_power_analysis": true},
+    "identity_grouping": "Each physical human has a stable study-subject ID independent of filename and image variant"
+  },
+  "methods": [
+    "unmodified_portrait_identity",
+    "2d_hair_compositor",
+    "generic_migan_inpainting",
+    "specialized_bald_conversion_future",
+    "reference_guided_student_future"
+  ],
+  "record_fields_required": [
+    "sample_id",
+    "source_subject_id",
+    "reference_subject_id",
+    "source_image_sha256",
+    "reference_image_sha256",
+    "consent_record_id",
+    "license_record_id",
+    "split",
+    "method_id",
+    "method_commit",
+    "status",
+    "device_id",
+    "hardware_environment_id",
+    "run_utc",
+    "seed",
+    "metrics"
+  ],
+  "metric_policy": {
+    "primary_quality": "Blinded human paired comparative judgment on hairstyle match, naturalness, facial identity and overall preference, with independent raters",
+    "secondary_quality": ["ArcFace face-identity cosine similarity where valid, reported with bias limitations", "non-hair region pixel change", "human-annotated boundary artifact rate", "landmark consistency"],
+    "systems": ["inference latency milliseconds", "cold startup milliseconds", "model bytes", "peak resident browser memory where measurable", "offline reload success", "blocked network request count"],
+    "failed_cases": "Must remain in denominator and must be reported separately, never omitted silently",
+    "fid_kid": "Do not use small pilot FID as conclusive proof of photorealism",
+    "no_claim_based_only_on_zero_network_requests": true
+  },
+  "statistics": {
+    "unit_of_independence": "source_subject_id",
+    "split_by_person": true,
+    "cluster_bootstrap_by_subject": true,
+    "default_bootstrap_replicates": 2000,
+    "report_confidence_interval": 0.95,
+    "pair_within_same_source_and_reference": true,
+    "multiple_comparisons": "Preselect primary comparison; adjust exploratory comparisons or label as exploratory",
+    "ablation_plan": ["no geometry", "no face protection", "no bald stage", "no reference conditioning", "unquantized vs quantized"],
+    "no_significance_claims_from_engineering_smoke_tests": true
+  },
+  "privacy_ethics": {
+    "never_store_photos_in_reports": true,
+    "no_public_photo_release_without_separate_permission": true,
+    "possible_institutional_ethics_review": true,
+    "gdpr_and_subject_withdrawal_process_required": true,
+    "avoid_unsupported_gender_or_demographic_inferences": true,
+    "consent_and_legal_basis_review_before_personal_data_collection": true
+  },
+  "decision_rules": {
+    "current_model": "MI-GAN generic inpainting, research-only; visual quality no-go",
+    "commercial_release": "Blocked until checkpoint-lineage license review, real portrait evaluation, and physical Android testing",
+    "scientific_publication": "Blocked until independent evidence, baseline comparisons, human study and complete reproducibility package",
+    "no_model_quality_claim_without_blinded_assessment": true
+  }
+}

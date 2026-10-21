@@ -4,14 +4,15 @@
  * Every script pack contains pre-bundled images, so success means the complete
  * catalog can open without a network connection (until browser data is evicted).
  */
-const VERSION='hananeh-static-20261021-v8';
+const VERSION='hananeh-static-20261021-v9';
 const PACKS=Array.from({length:14},(_,i)=>'./data/pack-'+String(i+1).padStart(2,'0')+'.js');
 const CORE=['./','./index.html','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png',...PACKS];
 // Optional AI assets: a missing model never prevents the offline catalog from installing.
 const AI_FILES=['./ai/hair-segmenter.mjs','./ai/mask-utils.mjs',
   './ai/vendor/vision_bundle.mjs','./ai/models/hair_segmenter.tflite',
   './ai/wasm/vision_wasm_internal.js','./ai/wasm/vision_wasm_internal.wasm',
-  './ai/wasm/vision_wasm_nosimd_internal.js','./ai/wasm/vision_wasm_nosimd_internal.wasm'];
+  './ai/wasm/vision_wasm_nosimd_internal.js','./ai/wasm/vision_wasm_nosimd_internal.wasm',
+  './ai/models/blaze_face_short_range.tflite'];
 async function cacheOptional(cache,path){
  try{
   if(await cache.match(path))return true;

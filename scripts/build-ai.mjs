@@ -17,28 +17,28 @@ for(const file of wasm){
   await fs.copyFile(path.join(source,'wasm',file),path.join(destination,'wasm',file));
 }
 const modelFolder=path.join(destination,'models');
-const modelFile=path.join(modelFolder,'hair_segmenter.tflite');
 await fs.mkdir(modelFolder,{recursive:true});
-const modelURL='https://storage.googleapis.com/mediapipe-models/image_segmenter/hair_segmenter/float32/1/hair_segmenter.tflite';
-let model;
-try{model=await fs.readFile(modelFile);}catch{}
-if(!model){
-  const response=await fetch(modelURL,{signal:AbortSignal.timeout(90000)});
-  if(!response.ok)throw Error('Hair model download failed: HTTP '+response.status);
-  model=Buffer.from(await response.arrayBuffer());
+const specs=[
+ ['hair_segmenter.tflite','https://storage.googleapis.com/mediapipe-models/image_segmenter/hair_segmenter/float32/1/hair_segmenter.tflite'],
+ ['blaze_face_short_range.tflite','https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite']
+];
+const models=[];
+for(const [name,url] of specs){
+ const file=path.join(modelFolder,name);
+ let data;
+ try{data=await fs.readFile(file);}catch{}
+ if(!data){
+  const response=await fetch(url,{signal:AbortSignal.timeout(90000)});
+  if(!response.ok)throw Error('Model download failed: '+name+' (HTTP '+response.status+')');
+  data=Buffer.from(await response.arrayBuffer());
+ }
+ if(data.length<100000||data.length>20000000||data.toString('ascii',4,8)!=='TFL3'){
+  throw Error('Invalid TFLite model: '+name);
+ }
+ await fs.writeFile(file,data);
+ models.push({name,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')});
 }
-if(model.length<100000||model.length>20000000||model.toString('ascii',4,8)!=='TFL3'){
-  throw Error('Invalid hair-segmentation TFLite model');
-}
-await fs.writeFile(modelFile,model);
 const packageJSON=JSON.parse(await fs.readFile(path.join(source,'package.json'),'utf8'));
-const manifest={
-  runtime:'@mediapipe/tasks-vision',
-  version:packageJSON.version,
-  model:'HairSegmenter float32 version 1',
-  modelSha256:createHash('sha256').update(model).digest('hex'),
-  modelBytes:model.length,
-  runtimeFiles:wasm
-};
+const manifest={runtime:'@mediapipe/tasks-vision',version:packageJSON.version,models,runtimeFiles:wasm};
 await fs.writeFile(path.join(destination,'model-info.json'),JSON.stringify(manifest,null,2)+'\n');
-console.log('Offline MediaPipe bundle created; model SHA256 '+manifest.modelSha256);
+console.log('Offline models bundled: '+models.map(m=>m.name+' '+m.sha256).join(' / '));

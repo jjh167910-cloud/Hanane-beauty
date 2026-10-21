@@ -76,16 +76,18 @@ function fallbackMask(image){const data=downscaleToMask(image).data;const c=docu
  }
  x.putImageData(im,0,0);return {mask:c,face:null,estimated:true};}
 let webHairPromise=null,webHairDisabled=false;
-async function getWebHairMask(image){
+async function getWebHairAnalysis(image){
  if(webHairDisabled)return null;
+ let segmenter;
  try{
   if(!webHairPromise)webHairPromise=import('./ai/hair-segmenter.mjs').then(m=>m.getLocalHairSegmenter());
-  const segmenter=await webHairPromise;
-  return segmenter.segment(image);
+  segmenter=await webHairPromise;
  }catch(error){
-  console.warn('Optional offline hair segmentation unavailable:',error);
-  webHairDisabled=true;webHairPromise=null;
-  return null;
+  console.warn('Optional offline vision engine unavailable:',error);
+  webHairDisabled=true;webHairPromise=null;return null;
+ }
+ try{return segmenter.analyze(image);}catch(error){
+  console.warn('On-device inference failed for this image:',error);return null;
  }
 }
 async function getMask(image,cacheKey){
@@ -95,8 +97,9 @@ async function getMask(image,cacheKey){
   const r=await nativeSegment(dataUrlFromImage(image));
   value={mask:await loadImage(r.mask),face:r.face||null,estimated:false};
  }else{
-  const mask=await getWebHairMask(image);
-  value=mask?{mask,face:null,estimated:false}:fallbackMask(image);
+  const analysis=await getWebHairAnalysis(image);
+  value=analysis?.mask?{mask:analysis.mask,face:analysis.face||null,estimated:false}:
+    {...fallbackMask(image),face:analysis?.face||null};
  }
  if(cacheKey.startsWith('ref_'))refCache.set(cacheKey,value);
  return value;

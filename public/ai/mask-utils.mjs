@@ -17,3 +17,17 @@ export function buildConfidenceMask(confidences,width,height){
   }
   return {pixels,positivePixels};
 }
+
+export function faceAnchor(detections){
+ if(!Array.isArray(detections)||!detections.length)return null;
+ const best=[...detections].sort((a,b)=>(b.categories?.[0]?.score||0)-(a.categories?.[0]?.score||0))[0];
+ const points=best.keypoints;
+ if(!Array.isArray(points)||points.length<2)return null;
+ const [a,b]=points;
+ if(![a.x,b.x,a.y,b.y].every(Number.isFinite))return null;
+ const eyeDistance=Math.abs(a.x-b.x);
+ if(eyeDistance<.045||eyeDistance>.5)return null;
+ const eyeX=(a.x+b.x)/2,eyeY=(a.y+b.y)/2;
+ if(eyeX<0||eyeX>1||eyeY<0||eyeY>1)return null;
+ return {eyeX,eyeY,eyeDistance};
+}

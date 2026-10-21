@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createUnverifiedStudy,evaluateStudyManifest,associateAnnotation}
  from '../public/ai/offhair-study-manifest.mjs';
 import {makeAnnotation,CLASS_BITS} from '../public/ai/offhair-annotation-core.mjs';
+import {auditStudyBundle} from './offhair-study-audit.mjs';
 
 const sha=v=>v.repeat(64);
 const make=(sampleId,sourceSubjectId,referenceSubjectId,split,ext={})=>({
@@ -97,4 +98,18 @@ test('Invalid subject IDs, image SHA, statuses or empty records are rejected',()
  assert.throws(()=>createUnverifiedStudy([],'offhair-study-001'),/1 to 100000/);
  assert.throws(()=>createUnverifiedStudy([{...recordA(),referenceSha256:'bad'}],'offhair-study-001'),/referenceSha256/);
  assert.throws(()=>createUnverifiedStudy([{...recordA(),labelingStatus:'certified'}],'offhair-study-001'),/labelingStatus/);
+});
+
+test('Bundle audit is mechanically valid but never independently rights-authorized',()=>{
+ const a=auditStudyBundle(study([recordA()]));
+ assert.equal(a.mechanicalValidity,true);
+ assert.equal(a.modelTrainingPermitted,false);
+ assert.equal(a.verifiedResearchParticipants,0);
+ assert.equal(a.manifest.authorizedTrainingRecords,0);
+});
+test('Bundle audit explicitly reports leakage and invalid annotation binding',()=>{
+ const a={...study([recordA()]),records:[recordA(),make('sample-002','personA','personD','test')]};
+ const r=auditStudyBundle(a);
+ assert.equal(r.mechanicalValidity,false);
+ assert.ok(r.problems.some(x=>x.type==='manifest_issue'));
 });

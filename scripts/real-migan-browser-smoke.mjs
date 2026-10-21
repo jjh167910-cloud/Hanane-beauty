@@ -54,6 +54,16 @@ try{
   console.log(label+' '+JSON.stringify(result));
  }
  await execute('REAL MI-GAN BROWSER INFERENCE PASSED');
+ const preserved=await page.evaluate(()=>{
+  const b=document.getElementById('before').getContext('2d');
+  const a=document.getElementById('after').getContext('2d');
+  const target=[260,300],original=Array.from(b.getImageData(...target,1,1).data),
+        generated=Array.from(a.getImageData(...target,1,1).data);
+  return {original,generated};
+ });
+ assert.deepEqual(preserved.generated,preserved.original,'Unmasked facial region was unexpectedly modified');
+ await page.screenshot({path:path.join(root,'ai/migan/synthetic-result-evidence.png'),fullPage:true});
+ console.log('SYNTHETIC OUTPUT SCREENSHOT AND UNMASKED PIXEL PRESERVATION VERIFIED');
  const audit=await page.evaluate(async()=>{
   const names=(await caches.keys()).filter(x=>x.startsWith('hananeh-static-'));
   if(!names.length)throw Error('No offline cache');

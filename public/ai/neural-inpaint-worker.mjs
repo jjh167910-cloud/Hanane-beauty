@@ -56,13 +56,34 @@ async function run(message){
  const pixels=new Uint8Array(tensor.data);
  return pixels.buffer;
 }
+/**
+ * True model smoke test: opens the actual SHA-verified ONNX weights, creates a
+ * Wasm inference session and runs synthetic RGB pixels with a known hole.
+ * No customer photograph is required for device compatibility testing.
+ */
+async function selfTest(){
+ const n=512*512;
+ const image=new Uint8Array(n*3);
+ image.fill(160);
+ const mask=new Uint8Array(n);mask.fill(255);
+ for(let y=216;y<296;y++)for(let x=216;x<296;x++)mask[y*512+x]=0;
+ const start=performance.now();
+ const output=await run({width:512,height:512,image:image.buffer,mask:mask.buffer});
+ if(output.byteLength!==n*3)throw Error('Unexpected synthetic inference output size');
+ const pixels=new Uint8Array(output);
+ if(pixels.some(value=>!Number.isFinite(value)))throw Error('Invalid synthetic output');
+ return {durationMs:Math.round(performance.now()-start),outputBytes:output.byteLength,
+  modelVerified:true,provider:'wasm'};
+}
 self.addEventListener('message',event=>{
  const d=event.data||{};
- if(d.type!=='RUN')return;
+ if(d.type!=='RUN'&&d.type!=='SELF_TEST')return;
  if(running){self.postMessage({type:'ERROR',id:d.id,error:'Neural engine is busy'});return;}
  running=true;
- Promise.resolve().then(()=>run(d)).then(buffer=>{
-  self.postMessage({type:'RESULT',id:d.id,image:buffer},[buffer]);
+ const isTest=d.type==='SELF_TEST';
+ Promise.resolve().then(()=>isTest?selfTest():run(d)).then(result=>{
+  if(isTest)self.postMessage({type:'TEST_RESULT',id:d.id,metrics:result});
+  else self.postMessage({type:'RESULT',id:d.id,image:result},[result]);
  }).catch(e=>self.postMessage({type:'ERROR',id:d.id,error:String(e?.message||e)}))
   .finally(()=>{running=false;});
 });

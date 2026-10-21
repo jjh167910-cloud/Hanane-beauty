@@ -57,7 +57,7 @@ test('Confirmatory study requires preregistered identity split AND ratings',()=>
  assert.throws(()=>validateEvidence(manifest([mk()],{
   study_kind:'confirmatory',consent_registry_verified:true,rights_registry_verified:true,
   split_frozen_before_evaluation:true
- })),/ratings/);
+ })),/blinded judgments/);
 });
 test('Unverified or nonfinite model metrics fail validation',()=>{
  assert.throws(()=>validateEvidence(manifest([mk({metrics:{inference_ms:NaN}})])),/nonfinite/);

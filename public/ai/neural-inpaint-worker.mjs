@@ -19,9 +19,13 @@ async function initialize(){
   const response=await fetch(new URL('./inpaint/'+name,import.meta.url),{cache:'force-cache'});
   if(!response.ok||response.redirected)throw Error('AI file not cached: '+name);
   const binary=new Uint8Array(await response.arrayBuffer());
-  if(binary.length<1024)throw Error('Invalid neural model shard');
+  // Reject truncated or unexpectedly large cache entries before allocating a
+  // second copy of the ONNX model on memory-constrained Android devices.
+  if(binary.length<1024||binary.length>12*1024*1024)
+   throw Error('Invalid neural model shard: '+name);
   parts.push(binary);size+=binary.length;
  }
+ if(size!==28079181)throw Error('Incorrect offline neural model size: '+size);
  const binary=new Uint8Array(size);
  let offset=0;
  for(const part of parts){binary.set(part,offset);offset+=part.length;}
@@ -71,7 +75,14 @@ async function selfTest(){
  const output=await run({width:512,height:512,image:image.buffer,mask:mask.buffer});
  if(output.byteLength!==n*3)throw Error('Unexpected synthetic inference output size');
  const pixels=new Uint8Array(output);
- if(pixels.some(value=>!Number.isFinite(value)))throw Error('Invalid synthetic output');
+ // Input pixels are 160 gray; the official pipeline composites its output
+ // onto unmasked input regions. A large mismatch means the ONNX contract or
+ // tensor interpretation changed, so keep the feature locked.
+ for(const i of [20*512+20,480*512+480,40*512+460]){
+  for(const ch of [0,1,2])
+   if(Math.abs(pixels[ch*n+i]-160)>8)
+    throw Error('Synthetic inference did not preserve known image pixels');
+ }
  return {durationMs:Math.round(performance.now()-start),outputBytes:output.byteLength,
   modelVerified:true,provider:'wasm'};
 }

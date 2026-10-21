@@ -155,3 +155,29 @@ test('Smaller portrait export avoids unsupported fake 2x sharpness',()=>{
  a.run("selfie=photo;userImage={};referenceLayer=hair;faceLayer=null;fitted={x:300,y:250,s:1,refEyeX:256,refEyeY:256,rotation:0};$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0");
  assert.equal(a.run("createExportCanvas().width"),768);
 });
+
+test('Residual hair repair stays behind the chosen hairstyle and the original face',()=>{
+ const a=app();
+ a.scope.photo={kind:'customer'};a.scope.repair={kind:'repair'};a.scope.hair={kind:'hairstyle'};a.scope.face={kind:'face'};
+ a.run("userImage=photo;repairLayer=repair;referenceLayer=hair;faceLayer=face;fitted={x:300,y:250,s:1,refEyeX:200,refEyeY:150,rotation:0};$('repairHair').checked=true;$('protectFace').checked=true;$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;drawResult()");
+ const order=a.draws.map(x=>x[0]);
+ assert.equal(order.indexOf(a.scope.repair)>order.indexOf(a.scope.photo),true);
+ assert.equal(order.indexOf(a.scope.hair)>order.indexOf(a.scope.repair),true);
+ assert.equal(order.indexOf(a.scope.face)>order.indexOf(a.scope.hair),true);
+});
+test('User can turn residual hair repair off without disabling hairstyle preview',()=>{
+ const a=app();a.scope.photo={kind:'customer'};a.scope.repair={kind:'repair'};a.scope.hair={kind:'hairstyle'};
+ a.run("userImage=photo;repairLayer=repair;referenceLayer=hair;faceLayer=null;fitted={x:250,y:250,s:1,refEyeX:250,refEyeY:250,rotation:0};$('repairHair').checked=false;$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;drawResult()");
+ assert.equal(a.draws.some(x=>x[0]===a.scope.repair),false);
+ assert.equal(a.draws.some(x=>x[0]===a.scope.hair),true);
+});
+test('Dragging a style clears stale repair pixels before the next frame',()=>{
+ const a=app();const handlers={},canvas=a.elements.get('resultCanvas');
+ canvas.addEventListener=(key,fn)=>handlers[key]=fn;
+ canvas.setPointerCapture=()=>{};
+ canvas.getBoundingClientRect=()=>({width:768,height:960});
+ a.run("hasResult=true;userImage={};repairLayer={kind:'previousRepair'};referenceLayer={};faceLayer=null;fitted={x:250,y:250,s:1,refEyeX:250,refEyeY:250,rotation:0};$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;handleDrag()");
+ handlers.pointerdown({clientX:100,clientY:120,pointerId:1});
+ handlers.pointermove({clientX:102,clientY:122,pointerId:1});
+ assert.equal(a.run('repairLayer'),null);
+});

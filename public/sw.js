@@ -4,9 +4,9 @@
  * Every script pack contains pre-bundled images, so success means the complete
  * catalog can open without a network connection (until browser data is evicted).
  */
-const VERSION='hananeh-static-20261021-v2';
+const VERSION='hananeh-static-20261021-v3';
 const PACKS=Array.from({length:14},(_,i)=>'./data/pack-'+String(i+1).padStart(2,'0')+'.js');
-const CORE=['./','./index.html','./catalog.js','./manifest.webmanifest','./icons/app.svg',...PACKS];
+const CORE=['./','./index.html','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png',...PACKS];
 async function send(client,message){try{client?.postMessage(message)}catch(_){}}
 async function auditCache(client){
   const cache=await caches.open(VERSION);

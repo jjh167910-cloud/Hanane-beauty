@@ -29,5 +29,5 @@ export function faceAnchor(detections){
  if(eyeDistance<.045||eyeDistance>.5)return null;
  const eyeX=(a.x+b.x)/2,eyeY=(a.y+b.y)/2;
  if(eyeX<0||eyeX>1||eyeY<0||eyeY>1)return null;
- return {eyeX,eyeY,eyeDistance};
+ return {eyeX,eyeY,eyeDistance,eyeSlope:(b.y-a.y)/(b.x-a.x)};
 }

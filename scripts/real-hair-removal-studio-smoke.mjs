@@ -109,4 +109,29 @@ try{
  assert.equal(result.realInpainting,true);assert.equal(result.realSegmentation,true);
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
  console.log('AIRPLANE MODE FULL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({inferenceMs:result.inferenceMs,cacheFiles:stored.files,referenceHairstyleTransfer:result.generatedHair}));
+ // Study existing bundled salon portraits without uploading them. Fail-closed rejects
+ // are counted as useful findings rather than coerced into unsafe scalp hallucinations.
+ const multi=[];
+ for(const id of ['2','3','6','9']){
+   await page.locator('#sample').selectOption(id);
+   await page.waitForFunction(()=>!document.querySelector('#analyze').disabled,{timeout:15000});
+   await page.locator('#analyze').click();
+   await page.waitForFunction(()=>!document.querySelector('#analyze').disabled,{timeout:45000});
+   const qualified=await page.locator('#approve').isEnabled();
+   if(!qualified){
+     multi.push({id,status:'rejected',reason:await page.locator('#status').textContent()});
+     continue;
+   }
+   await page.locator('#approve').check();
+   await page.locator('#run').click();
+   await page.waitForFunction(()=>!!window.__hananehHairStage,{timeout:180000});
+   const evidence=await page.evaluate(()=>window.__hananehHairStage);
+   multi.push({id,status:evidence.error?'error':'generated',inferenceMs:evidence.inferenceMs,
+     removedPixels:evidence.removedPixels,changedChannels:evidence.changedChannels,error:evidence.error});
+   if(!evidence.error)await page.screenshot({path:path.join(root,'ai/migan/catalog-'+id+'-inpainting-evidence.png'),fullPage:true});
+ }
+ console.log('MULTI-PORTRAIT QUALITY STUDY (NOT HUMAN-RATED) '+JSON.stringify(multi));
+ assert.deepEqual(errors,[]);
+ assert.deepEqual(external,[]);
+ await fs.writeFile(path.join(root,'ai/migan/portrait-benchmark.json'),JSON.stringify({model:'MI-GAN',offline:true,trialPortraits:multi,photographicQuality:'not certified',humanReviewRequired:true},null,2));
 }finally{await browser?.close();await new Promise(r=>server.close(r));}

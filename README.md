@@ -67,3 +67,14 @@ The `build` command copies a pinned local MediaPipe runtime and downloads Google
 
 ### Eye-landmark registration
 The build also bundles the Google BlazeFace short-range detector. It supplies a normalized eye center and eye distance for matching the chosen style to the customer's portrait. Detection is entirely on-device. If either model or detection fails, manual alignment and the approximate fallback remain functional. Catalog offline readiness and AI asset readiness are reported separately.
+
+
+## Quality compositor V2 (experimental; offline, not generative)
+
+The quality branch adds **face-region preservation**: the customer's original eye/nose/mouth pixels can be layered above the hairstyle, using a softly feathered face ellipse anchored to local BlazeFace eyes. Users can turn this off for bangs/fringes. Eye-line tilt also drives bounded hairstyle rotation. A local mask-coverage metric warns when the customer's existing hair extends outside the desired hairstyle; it does **not** magically remove that hair.
+
+The JPEG exporter is decoupled from the Before/After toggle and uses the decoded source photo at up to 1536×1920 when its resolution is sufficient. Hairstyle textures remain based on the 512px reference bank, so this change chiefly protects portrait/background clarity rather than adding hair detail. If high-resolution export runs out of memory, the app falls back to the preview output.
+
+The pure quality functions live in `public/ai/quality-core.mjs` and are included in the offline service worker cache. Automated quality and export regressions are in `scripts/quality-regression.mjs` and `scripts/tryon-regression.mjs`.
+
+**Still not solved:** automatic removal of the customer's previous long hair, synthesis of newly exposed background/scalp, hair relighting/shadow simulation, 3D pose-dependent occlusion, or realistic new strands. Actual salon-quality transfer requires an independently evaluated generative/inpainting engine. A passing source test alone is not visual proof. Never upload portraits to an online engine without explicit opt-in consent.

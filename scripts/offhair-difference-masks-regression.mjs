@@ -80,3 +80,30 @@ test('mapping translates reference origin via normalized eye anchors',()=>{
  assert.ok(v.counts.overlap>500);
  assert.ok(v.counts.add<200);
 });
+
+test('eye-roll similarity alignment restores scalp support under synthetic rigid roll',()=>{
+ const deg=Math.PI/6,cs=Math.cos(deg),sn=Math.sin(deg);
+ const src=mask([[45,9,84,30]]);
+ const dst=new Uint8Array(N*4);
+ const cx=face.eyeX*W,cy=face.eyeY*H;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const dx=x-cx,dy=y-cy;
+  const ox=Math.round(cx+cs*dx+sn*dy),oy=Math.round(cy-sn*dx+cs*dy);
+  if(ox>=0&&ox<W&&oy>=0&&oy<H)dst[(y*W+x)*4]=src[(oy*W+ox)*4];
+ }
+ const a={...face,eyeSpan:face.eyeDistance,eyeRollRadians:0};
+ const b={...face,eyeSpan:face.eyeDistance,eyeRollRadians:deg};
+ const options={sourceRGBA:src,referenceRGBA:dst,width:W,height:H,sourceFace:a,referenceFace:b};
+ const simple=differenceMaskStudy({...options,alignment:'eye-scale'});
+ const rotated=differenceMaskStudy({...options,alignment:'eye-similarity'});
+ assert.ok(rotated.counts.overlap>simple.counts.overlap,
+  'Similarity correction must improve overlap for pure head-roll data');
+ assert.ok(rotated.counts.remove<simple.counts.remove,
+  'Similarity correction should reduce false hair-removal regions');
+});
+test('roll-corrected mapping fails closed when roll inputs are unknown',()=>{
+ const a=mask([[28,4,69,28]]);
+ const v=differenceMaskStudy({sourceRGBA:a,referenceRGBA:a,width:W,height:H,
+  sourceFace:face,referenceFace:face,alignment:'eye-similarity'});
+ assert.equal(v.ok,false);assert.match(v.reason,/rotation/);
+});

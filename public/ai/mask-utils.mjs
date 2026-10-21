@@ -29,5 +29,11 @@ export function faceAnchor(detections){
  if(eyeDistance<.045||eyeDistance>.5)return null;
  const eyeX=(a.x+b.x)/2,eyeY=(a.y+b.y)/2;
  if(eyeX<0||eyeX>1||eyeY<0||eyeY>1)return null;
- return {eyeX,eyeY,eyeDistance,eyeSlope:(b.y-a.y)/(b.x-a.x)};
+ // Keypoint 2 is the nose tip in the BlazeFace six-point convention.
+ // A normalized nose-to-eye offset is a rough head-yaw proxy, not a 3D pose.
+ const nose=points[2];
+ const yaw= nose&&Number.isFinite(nose.x)&&nose.x>=0&&nose.x<=1
+   ? (nose.x-eyeX)/eyeDistance : null;
+ return {eyeX,eyeY,eyeDistance,eyeSlope:(b.y-a.y)/(b.x-a.x),
+   yaw:Number.isFinite(yaw)&&Math.abs(yaw)<=1.5?yaw:null};
 }

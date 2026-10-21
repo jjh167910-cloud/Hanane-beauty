@@ -7,7 +7,7 @@
     "test": "npm run build && npm run test:unit",
     "deploy": "npx wrangler deploy",
     "build": "node scripts/build-ai.mjs && node scripts/build-neural-inpaint.mjs",
-    "test:unit": "node scripts/verify.mjs && node --test scripts/tryon-regression.mjs scripts/offline-regression.mjs scripts/ai-regression.mjs scripts/quality-regression.mjs scripts/residual-hair-regression.mjs",
+    "test:unit": "node scripts/verify.mjs && node --test scripts/tryon-regression.mjs scripts/offline-regression.mjs scripts/ai-regression.mjs scripts/quality-regression.mjs scripts/residual-hair-regression.mjs scripts/neural-regression.mjs",
     "build:neural": "node scripts/build-neural-inpaint.mjs"
   },
   "devDependencies": {

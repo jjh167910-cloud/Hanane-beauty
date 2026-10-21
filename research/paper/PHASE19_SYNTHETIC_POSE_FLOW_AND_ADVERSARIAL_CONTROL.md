@@ -54,3 +54,15 @@ After the synthetic model is trained in CI, `scripts/real-offhair-difference-mas
 Expected metadata output: `research/results/offhair-phase19-synthetic-study.json`. Expected research-only weights: `public/ai/models/offhair-synthetic-pose-flow-v1.json`. Existing CI real-browser research tests run locally without external model inference requests.
 
 This experiment is a **falsifiable synthetic scaffold** for future research, not a replacement for the missing approved dataset or real generator.
+
+## CI-confirmed joint landmark domain-shift falsification (follow-up)
+Latest successful GitHub Actions: https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39650070031 .
+The initial real-catalog probe naively admitted **6/6** pairs to descriptive synthetic-flow inference when checking nose and ear feature magnitudes independently; even there, it approved **0/6** for editing because of unresolved/protected face conflicts.
+
+A model-specific **joint training-support** check was therefore added. In the procedural training generator, nose asymmetry is approximately `0.38*yaw +/- 0.01` and ear asymmetry approximately `0.8*yaw +/- 0.035`, so the combination `earBias - (0.8/0.38)*noseBias` should be close to zero. An exploratory conservative absolute residual cutoff of `0.13` (>2 times nominal synthetic noise envelope) detects a strongly different signature.
+
+On the five real bundled portrait examples (six directional pairings), the stricter joint gate returned **0/6 accepted for descriptive geometry analysis and 0/6 approved for automatic editing**. The underlying MediaPipe hair/face analysis, service-worker offline reload, synthetic-only student training, and existing browser inference tests remained green. This is a direct domain-transfer **NO-GO** for the current synthetic student.
+
+**Interpretation:** The discrepancy could arise from actual appearance variability, the proxy's arbitrary calibration, projection/landmark definitions, detector biases, or other unmodeled geometry. It cannot be resolved without externally annotated head pose and protected facial regions. Do not construe failed joint support as a demographic quality judgement or as a validated general rejector of real persons. Its role is simply **to prevent an inapplicable synthetic model from being used automatically**.
+
+The initial synthetic benchmark numbers remain unchanged. No new real target-hair ground truth or human study was obtained. This follow-up gate is exploratory and added after observing the small pilot; confirmatory evaluation must be independently frozen on an unseen, consented set.

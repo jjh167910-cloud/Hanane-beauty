@@ -13,6 +13,7 @@
 </main><nav class="bottomnav"><a href="#tryon"><span>◉</span>امتحان</a><a href="#styles"><span>▦</span>مدل‌ها</a><a href="#top" id="topLink"><span>⌂</span>خانه</a></nav>
 <div class="sheet" id="styleSheet" aria-hidden="true"><div class="sheet-content"><button class="sheet-close" id="sheetClose" type="button" aria-label="بستن">✕</button><img id="sheetImage" alt="نمونه مدل مو" src=""><div class="sheet-body"><span id="sheetCode" class="eyebrow"></span><h3 id="sheetTitle"></h3><p id="sheetDescription"></p><div id="variants" class="variants"></div><button id="selectStyleBtn" class="primary" type="button">امتحان این مدل روی عکس من</button></div></div></div>
 <script src="./ai/high-res-engine.js"></script>
+<script src="./ai/hair-coverage.js"></script>
 <script src="./catalog.js"></script>
 <script src="./data/pack-01.js"></script>
 <script src="./data/pack-02.js"></script>
@@ -38,6 +39,7 @@ const categoryNames={all:'همه',pixie:'پیکسی و کوتاه',bob:'باب �
 let catalog=[], filtered=[], selected=null, selectedVariant=0, selfie=null, userMask=null, referenceMask=null;
 let faceUser=null,faceRef=null, showBefore=false, hasResult=false, currentCat='all', search='', countVisible=30;
 let refImage=null,userImage=null,referenceLayer=null, maskBounds=null;
+let previewCoverage='unverified';
 // Higher-resolution source retained locally for export; preview stays 768x960.
 let exportPhoto=null,exportFactor=1;
 let inputRevision=0,uploadRevision=0;
@@ -115,6 +117,43 @@ function createHairLayer(image,mask){const c=document.createElement('canvas');c.
  const alpha=new Uint8Array(512*512);for(let y=1;y<511;y++)for(let px=1;px<511;px++){
  const idx=y*512+px;let acc=0;for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++)acc+=m[(idx+yy*512+xx)*4];alpha[idx]=Math.min(255,Math.max(0,(acc/9-65)*2.7));}
  for(let i=0;i<alpha.length;i++)d.data[i*4+3]=alpha[i];x.putImageData(d,0,0);return c;}
+function assessHairCoverage(){
+ if(!hasResult||!referenceLayer||!userMask?.mask||!window.HananehCoverage)return;
+ // Heuristic masks are not reliable enough to block exports. Only real local segmentation qualifies.
+ if(userMask.estimated||referenceMask?.estimated){previewCoverage='unverified';$('saveBtn').disabled=false;return;}
+ try{
+  const W=192,H=240,sc=document.createElement('canvas'),dc=document.createElement('canvas');
+  sc.width=dc.width=W;sc.height=dc.height=H;
+  const sx=sc.getContext('2d',{willReadFrequently:true});
+  const dx=dc.getContext('2d',{willReadFrequently:true});
+  if(!sx||!dx)throw Error('Mask comparison canvas unavailable');
+  sx.drawImage(userMask.mask,0,0,W,H);
+  dx.save();
+  dx.scale(W/PREVIEW_W,H/PREVIEW_H);
+  dx.translate(fitted.x+numeric('xRange'),fitted.y+numeric('yRange'));
+  dx.rotate(numeric('rotRange')*Math.PI/180);
+  const factor=fitted.s*numeric('scaleRange')/100;
+  dx.scale(factor,factor);
+  dx.drawImage(referenceLayer,-fitted.refEyeX,-fitted.refEyeY,512,512);
+  dx.restore();
+  const result=window.HananehCoverage.evaluate(sx.getImageData(0,0,W,H).data,dx.getImageData(0,0,W,H).data,W,H);
+  previewCoverage=result.status;
+  $('saveBtn').disabled=previewCoverage==='blocked';
+  if(previewCoverage==='blocked'){
+   setProgress('⚠ بخش زیادی از موی قبلی بیرون از مدل جدید دیده می‌شود. ذخیره غیرفعال است؛ مدل یا جایگذاری را تغییر دهید. این پیش‌نمایش جایگزینی واقعی مو نیست.');
+  }else if(previewCoverage==='warning'){
+   setProgress('⚠ بخشی از موی قبلی ممکن است بیرون از مدل جدید دیده شود. جایگذاری را بررسی کنید؛ این تصویر پیش‌نمایش ترکیبی است.');
+  }else if(previewCoverage==='inconclusive'){
+   setProgress('پوشش مو قابل ارزیابی مطمئن نیست. نتیجه فقط پیش‌نمایش ترکیبی است.');
+  }else{
+   setProgress('پیش‌نمایش ترکیبی آماده است. همپوشانی موی قبلی در این بررسی ساده قابل‌قبول بود؛ نتیجه تولید موی جدید با AI نیست.');
+  }
+ }catch(error){
+  previewCoverage='unverified';$('saveBtn').disabled=false;
+  console.warn('Hair-overlap quality check unavailable:',error);
+  setProgress('کنترل کیفیت همپوشانی اجرا نشد؛ این نتیجه فقط پیش‌نمایش تقریبی است.');
+ }
+}
 function drawUser(){ctx.clearRect(0,0,PREVIEW_W,PREVIEW_H);ctx.fillStyle='#eee8e0';ctx.fillRect(0,0,PREVIEW_W,PREVIEW_H);if(userImage){ctx.drawImage(userImage,0,0,PREVIEW_W,PREVIEW_H);}}
 function numeric(id){return Number($(id).value);}
 function drawResult(){drawUser();if(showBefore||!referenceLayer||!userImage)return;ctx.save();ctx.translate(fitted.x+numeric('xRange'),fitted.y+numeric('yRange'));ctx.rotate(numeric('rotRange')*Math.PI/180);const scale=fitted.s*numeric('scaleRange')/100;ctx.scale(scale,scale);ctx.drawImage(referenceLayer,-fitted.refEyeX,-fitted.refEyeY,512,512);ctx.restore();}
@@ -139,7 +178,7 @@ async function generate(){if(busy||loadingPhoto||!userImage||!selected)return;co
   referenceLayer=createHairLayer(refImage,referenceMask.mask);fitTransform();
   $('canvasPlaceholder').style.display='none';drawResult();hasResult=true;
   $('saveBtn').disabled=false;
-  setProgress(native?'پیش‌نمایش با استخراج AI مو آماده است. در صورت نیاز جایگذاری را تنظیم کنید.':(!userMask.estimated&&!referenceMask.estimated?'پیش‌نمایش با استخراج موی AI آفلاین آماده است؛ مدل مو هنوز فقط ترکیب تصویری است.':'پیش‌نمایش تقریبی آماده است؛ موتور تشخیص مو در این دستگاه در دسترس نیست.'));
+  setProgress(native?'پیش‌نمایش با استخراج AI مو آماده است. در صورت نیاز جایگذاری را تنظیم کنید.':(!userMask.estimated&&!referenceMask.estimated?'پیش‌نمایش با استخراج موی AI آفلاین آماده است؛ مدل مو هنوز فقط ترکیب تصویری است.':'پیش‌نمایش تقریبی آماده است؛ موتور تشخیص مو در این دستگاه در دسترس نیست.'));assessHairCoverage();
  }catch(e){if(revision===inputRevision){setProgress('امکان ساخت پیش‌نمایش نبود: '+e.message);hasResult=false;}}
  finally{busy=false;updateBtn();if(previewQueued){previewQueued=false;requestPreview();}}}
 async function uploadFile(file){if(!file)return;
@@ -147,7 +186,7 @@ async function uploadFile(file){if(!file)return;
  // A failed replacement must never leave an old customer's photo or export on screen.
  const upload=++uploadRevision;++inputRevision;
  loadingPhoto=false;userImage=null;userMask=null;faceUser=null;exportPhoto=null;exportFactor=1;
- hasResult=false;referenceLayer=null;showBefore=false;previewQueued=false;
+ hasResult=false;referenceLayer=null;showBefore=false;previewQueued=false;previewCoverage='unverified';
  $('saveBtn').disabled=true;$('toggleBefore').textContent='نمایش عکس اصلی';
  $('uploadLabel').textContent='انتخاب عکس از گوشی';
  $('canvasPlaceholder').style.display='flex';drawUser();updateBtn();
@@ -183,7 +222,7 @@ async function uploadFile(file){if(!file)return;
   userImage=photo;drawUser();$('canvasPlaceholder').style.display='none';$('uploadLabel').textContent='عکس انتخاب شد · برای تعویض لمس کنید';setProgress('عکس انتخاب شد؛ یک مدل مو انتخاب کرده و «ساخت پیش‌نمایش» را بزنید.');updateBtn();}
  catch(e){if(upload===uploadRevision)setProgress('امکان باز کردن عکس نبود: '+e.message);}
  finally{if(url)URL.revokeObjectURL(url);if(upload===uploadRevision){loadingPhoto=false;updateBtn();if(userImage&&selected)requestPreview();}}}
-async function save(){if(!hasResult)return;
+async function save(){if(!hasResult||previewCoverage==='blocked')return;
  try{
   let output=resultCanvas;
   if(exportPhoto&&exportFactor>1.02&&window.HananehExport&&referenceLayer){
@@ -211,14 +250,14 @@ function paintSheet(){$('sheetImage').src=imgPath(browsingStyle.variantIds[brows
 function closeSheet(){$('styleSheet').classList.remove('open');$('styleSheet').setAttribute('aria-hidden','true');}
 function chooseStyle(){if(!browsingStyle)return;selected=browsingStyle;selectedVariant=browsingVariant;++inputRevision;refImage=null;referenceLayer=null;hasResult=false;$('saveBtn').disabled=true;$('chosenThumb').src=imgPath(selected.variantIds[selectedVariant]);$('chosenThumb').style.display='block';$('chosenTitle').textContent=selected.variantNames[selectedVariant]||selected.name;$('chosenCode').textContent=selected.code;closeSheet();showBefore=false;resetControls();drawUser();updateBtn();setProgress(userImage?'در حال امتحان مدل روی عکس شما…':'مدل انتخاب شد. یک عکس واضح و روبه‌رو از خودتان انتخاب کنید.');document.getElementById('tryon').scrollIntoView({behavior:'smooth'});if(userImage)requestPreview();else if(!loadingPhoto)$('photoInput').click();}
 function resetControls(){['scaleRange','xRange','yRange','rotRange'].forEach((id,i)=>$(id).value=i===0?100:0);if(hasResult)drawResult();}
-function handleDrag(){let previous=null;resultCanvas.addEventListener('pointerdown',e=>{if(!hasResult)return;previous={x:e.clientX,y:e.clientY};resultCanvas.setPointerCapture(e.pointerId);});resultCanvas.addEventListener('pointermove',e=>{if(!previous)return;const rc=resultCanvas.getBoundingClientRect();const dx=(e.clientX-previous.x)*PREVIEW_W/rc.width;const dy=(e.clientY-previous.y)*PREVIEW_H/rc.height; $('xRange').value=Math.max(-180,Math.min(180,numeric('xRange')+dx));$('yRange').value=Math.max(-180,Math.min(180,numeric('yRange')+dy));previous={x:e.clientX,y:e.clientY};drawResult();});for(const event of ['pointerup','pointercancel'])resultCanvas.addEventListener(event,()=>previous=null);}
+function handleDrag(){let previous=null;resultCanvas.addEventListener('pointerdown',e=>{if(!hasResult)return;previous={x:e.clientX,y:e.clientY};resultCanvas.setPointerCapture(e.pointerId);});resultCanvas.addEventListener('pointermove',e=>{if(!previous)return;const rc=resultCanvas.getBoundingClientRect();const dx=(e.clientX-previous.x)*PREVIEW_W/rc.width;const dy=(e.clientY-previous.y)*PREVIEW_H/rc.height; $('xRange').value=Math.max(-180,Math.min(180,numeric('xRange')+dx));$('yRange').value=Math.max(-180,Math.min(180,numeric('yRange')+dy));previous={x:e.clientX,y:e.clientY};drawResult();assessHairCoverage();});for(const event of ['pointerup','pointercancel'])resultCanvas.addEventListener(event,()=>previous=null);}
 async function init(){try{const r={ok:true,json:async()=>window.OFFLINE_CATALOG};if(!r.ok)throw Error('catalog.json unavailable');catalog=await r.json();renderChips();filterStyles();}catch(e){setProgress('بارگذاری کاتالوگ با مشکل روبه‌رو شد. برنامه را از نسخه نصب‌شده اندروید اجرا کنید.');$('count').textContent='کاتالوگ در دسترس نیست';}}
 $('photoInput').addEventListener('change',e=>{const file=e.target.files&&e.target.files[0];e.target.value='';uploadFile(file);});
 $('heroTry').addEventListener('click',()=>$('tryon').scrollIntoView({behavior:'smooth'}));
 $('generateBtn').addEventListener('click',requestPreview);
 $('toggleBefore').addEventListener('click',()=>{showBefore=!showBefore;$('toggleBefore').textContent=showBefore?'نمایش نتیجه':'نمایش عکس اصلی';drawResult();});
 $('resetBtn').addEventListener('click',resetControls);$('saveBtn').addEventListener('click',save);
-for(const id of ['scaleRange','xRange','yRange','rotRange'])$(id).addEventListener('input',()=>{if(hasResult)drawResult();});
+for(const id of ['scaleRange','xRange','yRange','rotRange'])$(id).addEventListener('input',()=>{if(hasResult){drawResult();assessHairCoverage();}});
 $('search').addEventListener('input',e=>{search=normalizeFarsi(e.target.value);filterStyles();});
 $('chips').addEventListener('click',e=>{const t=e.target.closest('[data-cat]');if(!t)return;currentCat=t.dataset.cat;renderChips();filterStyles();});
 $('styleGrid').addEventListener('click',e=>{const t=e.target.closest('[data-id]');if(t)openStyle(t.dataset.id);});

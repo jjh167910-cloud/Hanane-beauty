@@ -48,3 +48,23 @@ test('Eye-distance anchors improve automatic registration with valid face detect
   assert.equal(faceAnchor([{keypoints:[{x:.5,y:.5},{x:.51,y:.5}]}]),null);
   assert.equal(faceAnchor([]),null);
 });
+
+test('Six-keypoint MediaPipe detection exposes anatomical anchors for research',()=>{
+ const features=faceAnchor([{categories:[{score:.98}],keypoints:[
+  {x:.40,y:.4},{x:.60,y:.4},{x:.5,y:.49},{x:.5,y:.61},
+  {x:.34,y:.52},{x:.66,y:.52}
+ ]}]);
+ assert.ok(features);
+ assert.equal(features.noseY,.49);
+ assert.equal(features.mouthY,.61);
+ assert.equal(features.eyes.length,2);
+ assert.equal(features.earPoints.length,2);
+});
+test('Reject anatomically inverted nose and mouth without breaking legacy eye anchors',()=>{
+ const features=faceAnchor([{keypoints:[
+  {x:.40,y:.4},{x:.60,y:.4},{x:.5,y:.58},{x:.5,y:.42}
+ ]}]);
+ assert.ok(features);
+ assert.equal(features.mouthY,undefined);
+ assert.equal(features.eyeDistance,.2);
+});

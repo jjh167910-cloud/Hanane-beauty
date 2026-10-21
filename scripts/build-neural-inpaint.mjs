@@ -15,18 +15,26 @@ const files=['ort.wasm.min.mjs','ort-wasm-simd-threaded.wasm','ort-wasm-simd-thr
 await fs.mkdir(path.join(dest,'runtime'),{recursive:true});
 for(const file of files)await fs.copyFile(path.join(vendor,file),path.join(dest,'runtime',file));
 const model='migan_pipeline_v2.onnx';
-const remote='https://huggingface.co/andraniksargsyan/migan/resolve/main/'+model;
+const remote='https://huggingface.co/andraniksargsyan/migan/resolve/1538c135034b8c535f198d2a3569eaefc0309d5a/'+model;
 const expectedSha='6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b';
 const original=path.join(dest,model);
+const sha=b=>createHash('sha256').update(b).digest('hex');
 let bytes;
 try{bytes=await fs.readFile(original);}catch{}
+// Reuse verified shards on repeat builds to avoid needless model downloads.
+if(!bytes)try{
+ const existing=await Promise.all(['model-part-00.bin','model-part-01.bin','model-part-02.bin']
+  .map(file=>fs.readFile(path.join(dest,file))));
+ const previous=Buffer.concat(existing);
+ if(sha(previous)===expectedSha)bytes=previous;
+}catch{}
 if(!bytes){
  const response=await fetch(remote,{redirect:'follow',signal:AbortSignal.timeout(180000)});
  if(!response.ok)throw Error('MI-GAN model download failed: HTTP '+response.status);
  bytes=Buffer.from(await response.arrayBuffer());
 }
-const digest=createHash('sha256').update(bytes).digest('hex');
-if(digest!==expectedSha)throw Error('MI-GAN model hash mismatch; refusing unsafe binary: '+digest);
+const digest=sha(bytes);
+if(bytes.length!==28079181||digest!==expectedSha)throw Error('MI-GAN model size/hash mismatch; refusing unsafe binary: '+digest);
 const shardSize=12*1024*1024;
 const parts=[];
 for(let offset=0;offset<bytes.length;offset+=shardSize){

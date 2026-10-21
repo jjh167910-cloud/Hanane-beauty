@@ -35,8 +35,8 @@ test('Uncertainty remains visible and is excluded from score',()=>{
 });
 test('Never compare different source image digests or subject IDs',()=>{
  const a=annotated('annotator-1'),b0=annotated('annotator-2');
- assert.throws(()=>compareIndependentLabels(a,{...b0,portraitSha256:'b'.repeat(64)}),/exactly same image/);
- assert.throws(()=>compareIndependentLabels(a,{...b0,subjectId:'subject-002'}),/exactly same image/);
+ assert.throws(()=>compareIndependentLabels(a,{...b0,portraitSha256:'b'.repeat(64)}),/exactly the same image/);
+ assert.throws(()=>compareIndependentLabels(a,{...b0,subjectId:'subject-002'}),/exactly the same image/);
 });
 test('Do not mistake the same annotator for two independent raters',()=>{
  const a=annotated('annotator-1'),b0=annotated('annotator-1');

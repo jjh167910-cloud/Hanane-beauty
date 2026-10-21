@@ -32,6 +32,23 @@ export function faceAnchor(detections){
  // Preserve legacy horizontal eyeDistance for current try-on positioning.
  // Additional geometry is research-only; nonrigid yaw is NOT recovered by roll.
  const dx=b.x-a.x,dy=b.y-a.y;
+ const extras={};
+ // MediaPipe FaceDetector's documented keypoints 2=nose tip, 3=mouth center,
+ // 4/5=ear tragions. Do not interpolate missing landmarks or claim 3D.
+ const [nose,mouth,rightEar,leftEar]=points.slice(2,6);
+ if(nose&&mouth&&[nose.x,nose.y,mouth.x,mouth.y].every(Number.isFinite)&&
+   nose.y>eyeY+eyeDistance*.12&&nose.y<eyeY+eyeDistance*1.65&&
+   mouth.y>nose.y+eyeDistance*.12&&mouth.y<eyeY+eyeDistance*2.7&&
+   Math.abs(nose.x-eyeX)<eyeDistance*.85&&
+   Math.abs(mouth.x-eyeX)<eyeDistance*.85){
+   extras.noseX=nose.x;extras.noseY=nose.y;
+   extras.mouthX=mouth.x;extras.mouthY=mouth.y;
+ }
+ if(rightEar&&leftEar&&[rightEar.x,rightEar.y,leftEar.x,leftEar.y].every(Number.isFinite)&&
+   Math.abs(rightEar.x-leftEar.x)>eyeDistance*.9&&
+   Math.abs(rightEar.x-leftEar.x)<eyeDistance*3.6){
+   extras.earPoints=[{x:rightEar.x,y:rightEar.y},{x:leftEar.x,y:leftEar.y}];
+ }
  return {eyeX,eyeY,eyeDistance,eyeSpan:Math.hypot(dx,dy),
-   eyeRollRadians:Math.atan2(dy,dx)};
+   eyeRollRadians:Math.atan2(dy,dx),eyes:[{x:a.x,y:a.y},{x:b.x,y:b.y}],...extras};
 }

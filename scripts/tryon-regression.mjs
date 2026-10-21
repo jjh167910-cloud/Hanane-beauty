@@ -107,3 +107,36 @@ test('Corrupt portrait leaves the canvas in an empty state',async()=>{
   assert.equal(a.elements.get('canvasPlaceholder').style.display,'flex');
   assert.equal(a.elements.get('saveBtn').disabled,true);
 });
+
+test('Preview preserves the original face after adding the style layer',()=>{
+ const a=app();
+ a.scope.photo={photo:true};a.scope.hair={hair:true};a.scope.face={face:true};
+ a.run("userImage=photo;referenceLayer=hair;faceLayer=face;fitted={x:300,y:300,s:1,refEyeX:200,refEyeY:150,rotation:0};$('protectFace').checked=true;$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;drawResult()");
+ const stack=a.draws.map(args=>args[0]);
+ assert.ok(stack.indexOf(a.scope.hair)>=0);
+ assert.ok(stack.indexOf(a.scope.face)>stack.indexOf(a.scope.hair));
+});
+
+test('Face-preservation toggle can disable the overlay for fringe styles',()=>{
+ const a=app();
+ a.scope.photo={photo:true};a.scope.hair={hair:true};a.scope.face={face:true};
+ a.run("userImage=photo;referenceLayer=hair;faceLayer=face;fitted={x:300,y:300,s:1,refEyeX:200,refEyeY:150,rotation:0};$('protectFace').checked=false;$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;drawResult()");
+ assert.ok(a.draws.some(args=>args[0]===a.scope.hair));
+ assert.equal(a.draws.some(args=>args[0]===a.scope.face),false);
+});
+
+test('Tilted reference and customer eyes produce bounded automatic orientation correction',()=>{
+ const a=app();
+ a.run("maskBox=()=>({x:.2,y:.1,w:.55,h:.40});userMask={mask:{}};referenceMask={mask:{}};faceUser={eyeX:.5,eyeY:.35,eyeDistance:.2,eyeSlope:.10};faceRef={eyeX:.5,eyeY:.35,eyeDistance:.2,eyeSlope:-.08};fitTransform()");
+ const rotation=a.run('fitted.rotation');
+ assert.ok(rotation>.15 && rotation<=.23);
+ assert.ok(Number.isFinite(a.run('fitted.s')));
+});
+
+test('Excessive original hair exposure yields a clear caution, not a realism claim',()=>{
+ const a=app();
+ a.run("userMask={estimated:false};referenceMask={estimated:false};updateQualityNotice({reliable:true,fraction:.6})");
+ assert.match(a.elements.get('qualityNotice').textContent,/هشدار/);
+ a.run("updateQualityNotice({reliable:true,fraction:0})");
+ assert.match(a.elements.get('qualityNotice').textContent,/پیش‌نمایش/);
+});

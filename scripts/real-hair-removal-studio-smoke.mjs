@@ -70,6 +70,7 @@ try{
  assert.equal(result.realInpainting,true);
  assert.equal(result.generatedHair,false);
  assert.equal(result.faceOutsideMaskPreserved,true);
+ assert.equal(result.outsideMaskChangedPixels,0,'Real browser must preserve every non-removal pixel');
  assert.ok(result.changedChannels>1000);
  const comparison=await page.evaluate(()=>{
   const a=document.querySelector('#portrait').getContext('2d').getImageData(0,0,512,512).data;
@@ -116,6 +117,7 @@ try{
  result=await page.evaluate(()=>window.__hananehHairStage);
  assert.ok(!result.error,'Offline repeat: '+result.error);
  assert.equal(result.realInpainting,true);assert.equal(result.realSegmentation,true);
+ assert.equal(result.outsideMaskChangedPixels,0,'Airplane-mode reconstruction must not alter protected pixels');
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
  console.log('AIRPLANE MODE FULL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({inferenceMs:result.inferenceMs,cacheFiles:stored.files,referenceHairstyleTransfer:result.generatedHair}));
  // Study existing bundled salon portraits without uploading them. Fail-closed rejects

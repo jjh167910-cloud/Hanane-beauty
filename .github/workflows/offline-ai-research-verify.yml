@@ -24,6 +24,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Verify genuine browser-only hair segmentation
         run: node scripts/real-browser-inference-smoke.mjs
+      - name: Train and evaluate isolated synthetic pose-flow student (NO real images)
+        run: npm run research:pose:synthetic
       - name: Run real source/reference hair difference-mask topology offline experiment
         run: node scripts/real-offhair-difference-mask-smoke.mjs
       - name: Verify browser-local OffHair ground-truth drawing, metadata export and offline reload
@@ -45,6 +47,7 @@ jobs:
           path: |
             research/paper/protocol-v1.json
             research/results/offhair-ci-smoke-evidence.json
+            research/results/offhair-phase19-synthetic-study.json
           retention-days: 30
           if-no-files-found: error
       - name: Package complete offline website

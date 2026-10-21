@@ -4,7 +4,7 @@
  * Every script pack contains pre-bundled images, so success means the complete
  * catalog can open without a network connection (until browser data is evicted).
  */
-const VERSION='hananeh-static-20261021-v12-bg-repair';
+const VERSION='hananeh-static-20261021-v13-isolation';
 const PACKS=Array.from({length:14},(_,i)=>'./data/pack-'+String(i+1).padStart(2,'0')+'.js');
 const CORE=['./','./index.html','./ai/high-res-engine.js','./ai/hair-coverage.js','./ai/background-repair.js','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png',...PACKS];
 // Optional AI assets: a missing model never prevents the offline catalog from installing.
@@ -24,8 +24,14 @@ async function cacheOptional(cache,path){
 
 // Browsers reject followed-redirect responses for some offline navigations.
 function navigationResponse(response){
-  if(!response?.redirected)return response;
-  return new Response(response.body,{status:response.status,statusText:response.statusText,headers:response.headers});
+  if(!response)return response;
+  // Cache entries may have been stored before isolation headers were deployed.
+  // Always replay COOP/COEP for offline PWA navigations, even from an old cache.
+  const headers=new Headers(response.headers);
+  headers.set('Cross-Origin-Opener-Policy','same-origin');
+  headers.set('Cross-Origin-Embedder-Policy','require-corp');
+  headers.set('Cross-Origin-Resource-Policy','same-origin');
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 async function send(client,message){try{client?.postMessage(message)}catch(_){}}
 async function auditCache(client){

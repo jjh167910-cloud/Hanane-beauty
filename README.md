@@ -119,3 +119,15 @@ The experimental Persian consultation UI now includes **تست واقعی موت
 The output compositor now uses a bounded six-pixel interior alpha feather around inpainted regions. This smooths small seams; it cannot restore missing hairstyle detail or make the 512px reference haircut generative.
 
 The offline bundler now validates the WebAssembly magic header and exact contents SHA-256 of every shipped ONNX Runtime binary, enforces Cloudflare's 25 MiB per-file limit and records total bytes in `public/ai/inpaint/bundle.json`. The `neural-regression.mjs` release gate verifies these exact emitted files, not only JavaScript source declarations. This does **not** establish Android inferences have been run; real-device results are still required before merging.
+
+
+## Verified Cloudflare preview deployment (2026-10-21)
+
+Cloudflare feature-branch auto-build `98a175d1-54db-419d-8fb0-dfa7f79bc213` completed **successfully** on commit `e736d273e92b177f01d060f0e96f500d9722b069`.
+
+- Real `npm test` invoked `npm run build`, downloaded and SHA-verified MI-GAN from the **correct immutable Hugging Face commit** `1538c135034b8cfe7a8472f34d09c8a5a45b17a7` (the previously documented full SHA was incorrect and caused HTTP 404), packaged local ONNX Runtime Web and MediaPipe models, then passed **79/79 Node tests**.
+- Wrangler required a branch-only `[previews]` stanza, which was added to `wrangler.toml`. Cloudflare then uploaded all 15 changed static assets (including all three MI-GAN shards) and deployed the isolated preview successfully.
+- Preview URL: https://feature-quality-compositor-v2-hanane-beauty.mostifa2273.workers.dev/
+- Unique deployment URL: https://b48a7f4d-hanane-beauty.mostifa2273.workers.dev
+- Production `main` remains unaffected. Cloudflare success means build/package/deploy, **not** proven successful Android WASM inference or salon-quality generative hair. Device test required: open preview on intended Android Chrome, opt in to download neural model, tap `تست واقعی موتور روی گوشی`, then validate a real portrait/style and airplane-mode behavior. Do not publish private customer portraits or send them to external tools.
+- Some web crawlers cannot access Workers preview URLs, so no browser-level preview screenshot or independent GET verification was obtained in this run.

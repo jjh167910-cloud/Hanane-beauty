@@ -263,3 +263,23 @@ test('Unsupported Android Worker gracefully reports failure without breaking ord
  assert.match(a.elements.get('neuralStatus').textContent,/تست مدل موفق نبود/);
  assert.equal(a.run('hasResult'),true);
 });
+
+test('Cancelled neural self-test cannot overwrite newer portrait state',async()=>{
+ const a=app();let resolve;
+ a.scope.pendingSelfTest=new Promise(r=>resolve=r);
+ a.run("neuralInstalled=true;hasResult=true;userImage={};getNeuralWorker=()=>({postMessage(){},terminate(){},addEventListener(){}});neuralPending.set=neuralPending.set.bind(neuralPending)");
+ // Simulate the stale success resolving after the phone has replaced the photo.
+ a.run("testNeuralEngine=async function(){const epoch=++neuralEpoch;neuralBusy=true;const data=await pendingSelfTest;if(epoch!==neuralEpoch)return;neuralVerified=data;neuralMessage('old result')}");
+ const first=a.run('testNeuralEngine()');
+ a.run("++neuralEpoch;neuralVerified=false;neuralBusy=false;neuralMessage('current state')");
+ resolve(true);await first;
+ assert.equal(a.run('neuralVerified'),false);
+ assert.equal(a.elements.get('neuralStatus').textContent,'current state');
+});
+test('Neural worker assembly uses one preallocated verified model buffer',()=>{
+ const code=fs.readFileSync(new URL('../public/ai/neural-inpaint-worker.mjs',import.meta.url),'utf8');
+ assert.match(code,/PART_SIZES=\[12582912,12582912,2913357\]/);
+ assert.match(code,/const binary=new Uint8Array\(size\)/);
+ assert.doesNotMatch(code,/parts\.push\(binary\)/);
+ assert.match(code,/binary\.set\(part,offset\)/);
+});

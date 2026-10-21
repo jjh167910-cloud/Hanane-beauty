@@ -80,3 +80,8 @@ test('Median latency computed only from successful cases with rejections include
 test('Never admit raw image payloads in metadata manifest',()=>{
  assert.throws(()=>validateEvidence(manifest([mk()],{includes_images:true})),/images/);
 });
+
+test('Bald-conversion placeholder cannot inflate independent reference-identity count',()=>{
+ const r=validateEvidence(manifest([mk({reference_subject_id:'no-reference-hair-removal'})]));
+ assert.equal(r.distinct_reference_people,0);
+});

@@ -46,10 +46,11 @@ try{
   await page.locator('#consent').fill('consent-NOT-VERIFIED');
   await page.locator('#rights').fill('rights-NOT-VERIFIED');
   await page.locator('#ack').check();
-  const canvas=page.locator('#overlay'),box=await canvas.boundingBox();
-  assert.ok(box);
+  const canvas=page.locator('#overlay');
   async function stroke(bit,x,y){
    await page.locator('[data-bit="'+bit+'"]').click();
+   await canvas.scrollIntoViewIfNeeded();
+   const box=await canvas.boundingBox();assert.ok(box);
    await page.mouse.move(box.x+box.width*x,box.y+box.height*y);
    await page.mouse.down();
    await page.mouse.move(box.x+box.width*(x+.025),box.y+box.height*(y+.018),{steps:5});

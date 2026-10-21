@@ -110,3 +110,12 @@ The expensive ONNX Worker is terminated, pending model tasks are rejected, and s
 A second inpainting gate rejects masks that touch the top, sides or internal lower boundary of its 512px inference crop, preventing artificial horizontal lines where the reconstruction would abruptly stop. That means long hair extending beyond the safe crop may be **intentionally refused**, not erased.
 
 Verification in this pass: 28/28 targeted try-on interaction checks; 6/6 isolated MediaPipe mask/face regression checks; additional synthetic tests for pose and cropped reconstruction. This is **not** an Android inference/photorealism certification; the full project build and real-model image tests remain pending.
+
+
+### Actual on-device inference verification (new release gate)
+
+The experimental Persian consultation UI now includes **تست واقعی موتور روی گوشی** after the optional neural assets have finished caching. This test executes a real, synthetic MI-GAN ONNX 512×512 inference inside the local WASM Worker, checks the pinned model SHA-256, validates output shape and unmodified known pixels, and reports observed test duration to the user. It does **not use a customer's photo or upload any data**. Neural hair repair remains disabled until the smoke test succeeds on the current device/session. On Android without a supported module Worker or adequate RAM, the test fails gracefully and ordinary preview remains available.
+
+The output compositor now uses a bounded six-pixel interior alpha feather around inpainted regions. This smooths small seams; it cannot restore missing hairstyle detail or make the 512px reference haircut generative.
+
+The offline bundler now validates the WebAssembly magic header and exact contents SHA-256 of every shipped ONNX Runtime binary, enforces Cloudflare's 25 MiB per-file limit and records total bytes in `public/ai/inpaint/bundle.json`. The `neural-regression.mjs` release gate verifies these exact emitted files, not only JavaScript source declarations. This does **not** establish Android inferences have been run; real-device results are still required before merging.

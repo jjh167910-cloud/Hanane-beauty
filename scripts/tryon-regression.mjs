@@ -217,3 +217,23 @@ test('Large customer-versus-reference pose differences disable neural restoratio
  assert.equal(a.elements.get('neuralRun').disabled,true);
  assert.match(a.run("updateQualityNotice({reliable:false});$('qualityNotice').textContent"),/زاویه/);
 });
+
+test('Neural cancellation kills the worker and clears pending private image jobs',()=>{
+ const a=app();a.scope.killed=0;a.scope.rejected=0;
+ a.run("neuralInstalled=true;neuralBusy=true;neuralLayer={old:true};neuralWorker={terminate:()=>killed++};neuralPending.set(3,{timeout:null,reject:()=>rejected++});cancelNeuralInference()");
+ assert.equal(a.scope.killed,1);
+ assert.equal(a.scope.rejected,1);
+ assert.equal(a.run('neuralBusy'),false);
+ assert.equal(a.run('neuralWorker'),null);
+ assert.equal(a.run('neuralLayer'),null);
+ assert.equal(a.run('neuralPending.size'),0);
+});
+test('Uploading an invalid replacement still terminates the previous neural inference',async()=>{
+ const a=app();a.scope.killed=0;
+ a.run("neuralBusy=true;neuralWorker={terminate:()=>killed++};neuralPending.set(1,{timeout:null,reject:()=>{}});hasResult=true");
+ await a.run("uploadFile({type:'text/plain',name:'invalid.txt',size:200})");
+ assert.equal(a.scope.killed,1);
+ assert.equal(a.run('neuralWorker'),null);
+ assert.equal(a.run('neuralLayer'),null);
+ assert.equal(a.run('hasResult'),false);
+});

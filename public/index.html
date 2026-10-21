@@ -63,7 +63,7 @@ function postHQ(type){
   target.postMessage({type});
  }).catch(error=>neuralMessage('آماده‌سازی موتور آفلاین ممکن نبود: '+error.message));
 }
-if('serviceWorker' in navigator){
+if(typeof navigator!=='undefined'&&'serviceWorker' in navigator){
  navigator.serviceWorker.addEventListener('message',e=>{
   const m=e.data||{};
   if(m.type==='HQ_AUDIT'){

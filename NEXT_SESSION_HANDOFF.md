@@ -31,3 +31,9 @@ Added browser-only hair extraction using the pinned `@mediapipe/tasks-vision@0.1
 
 ## Eye landmark augmentation
 Source commit added offline BlazeFace short-range face detection, normalized eye anchoring, and image-local fallback (a single non-hair photograph no longer permanently disables the segmentation engine). 9 optional AI assets now include two TFLite models. Offline audit checks core app and AI bundle independently. Added face anchor and cache-count regression expectations. Build/run verification and live redeploy still pending.
+
+## Quality V2 residual-hair cleanup checkpoint (experimental branch)
+
+Branch: `feature/quality-compositor-v2`; PR: https://github.com/jjh167910-cloud/Hanane-beauty/pull/1 (draft). The live site remains on main.
+
+Added `public/ai/residual-hair-repair.mjs`: strictly bounded, color-consistency-gated repair for small exposed hair areas against uniform backgrounds; input images/masks are not mutated; excludes detected face and rejects large source-hair regions. Integrated repaired transparent layer into preview and HD export. Preserved controls and per-portrait privacy. UI toggle allows opting out. Recomputes overlap warning/repair when sliders settle and upon pointer release, clearing stale overlay during drag. Service worker now uses `hananeh-static-20261021-v11`, precaches both quality modules, and `test:unit` includes `scripts/residual-hair-regression.mjs` alongside previous regressions. Synthetic checks passed for flat backdrop repair, busy-background refusal, face protection, and JavaScript parsing. Full branch `npm test`, real-device screenshot review, and production deployment **not yet validated**. Do not merge into main or claim photorealism before validation.

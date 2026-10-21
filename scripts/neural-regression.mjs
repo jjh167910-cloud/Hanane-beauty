@@ -97,8 +97,22 @@ test('The actual offline production bundle contains verified MI-GAN weights and 
  assert.equal(model.length,28079181);
  assert.equal(createHash('sha256').update(model).digest('hex'),
   '6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b');
- for(const p of ['runtime/ort.wasm.min.mjs','runtime/ort-wasm-simd-threaded.mjs','runtime/ort-wasm-simd-threaded.wasm'])
-  assert.ok(fs.statSync(new URL(p,root)).size>1000,'Missing local ONNX runtime: '+p);
+ const manifest=JSON.parse(fs.readFileSync(new URL('bundle.json',root),'utf8'));
+ assert.equal(manifest.modelSha256,
+  '6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b');
+ assert.equal(manifest.runtimeFiles.length,3);
+ for(const entry of manifest.runtimeFiles){
+  const location=new URL(entry.file,root);
+  const contents=fs.readFileSync(location);
+  assert.equal(contents.length,entry.bytes,'Bad runtime size: '+entry.file);
+  assert.ok(entry.bytes>1000&&entry.bytes<=25*1024*1024,
+   'Exceeds Cloudflare single-asset limit: '+entry.file);
+  assert.equal(createHash('sha256').update(contents).digest('hex'),entry.sha256);
+  if(entry.file.endsWith('.wasm'))
+   assert.deepEqual([...contents.subarray(0,4)],[0,97,115,109]);
+ }
+ assert.equal(manifest.totalDownloadBytes,
+  model.length+manifest.runtimeFiles.reduce((sum,f)=>sum+f.bytes,0));
 });
 
 test('Neural restoration rejects a removal mask cut off by the crop edge',()=>{
@@ -151,4 +165,12 @@ test('AI smoke test executes true local model inference rather than only checkin
  assert.match(html,/id="neuralTest"/);
  assert.match(html,/neuralVerified/);
  assert.match(html,/neuralInstalled\|\|!neuralVerified/);
+});
+
+test('Build refuses oversized or malformed ONNX Runtime browser assets',()=>{
+ const code=fs.readFileSync(new URL('../scripts/build-neural-inpaint.mjs',import.meta.url),'utf8');
+ assert.match(code,/maxStaticAsset=25\*1024\*1024/);
+ assert.match(code,/payload\[0\]!==0/);
+ assert.match(code,/runtimeFiles\.push/);
+ assert.match(code,/totalDownloadBytes/);
 });

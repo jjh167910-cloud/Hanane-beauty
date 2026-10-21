@@ -27,7 +27,7 @@ for(const file of files){
   sha256:createHash('sha256').update(payload).digest('hex')});
 }
 const model='migan_pipeline_v2.onnx';
-const remote='https://huggingface.co/andraniksargsyan/migan/resolve/1538c135034b8c535f198d2a3569eaefc0309d5a/'+model;
+const remote='https://huggingface.co/andraniksargsyan/migan/resolve/1538c135034b8cfe7a8472f34d09c8a5a45b17a7/'+model;
 const expectedSha='6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b';
 const original=path.join(dest,model);
 const sha=b=>createHash('sha256').update(b).digest('hex');

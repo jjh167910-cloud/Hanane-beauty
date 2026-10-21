@@ -4,7 +4,7 @@
  * Every script pack contains pre-bundled images, so success means the complete
  * catalog can open without a network connection (until browser data is evicted).
  */
-const VERSION='hananeh-static-20261021-v12';
+const VERSION='hananeh-static-20261021-v13';
 const HQ_CACHE='hananeh-hq-inpaint-model-v1';
 const PACKS=Array.from({length:14},(_,i)=>'./data/pack-'+String(i+1).padStart(2,'0')+'.js');
 const CORE=['./','./index.html','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png','./ai/quality-core.mjs','./ai/residual-hair-repair.mjs','./ai/neural-inpaint-core.mjs','./ai/neural-inpaint-worker.mjs',...PACKS];
@@ -130,6 +130,12 @@ self.addEventListener('fetch',event=>{
     const hq=await caches.open(HQ_CACHE);
     const model=await hq.match(req,{ignoreSearch:true});
     if(model)return model;
+    // Model weights and WASM runtimes must never be downloaded merely
+    // because a page/Worker requested their URL. Installation requires the
+    // explicit HQ_PREPARE action, keeping large bandwidth use opt-in.
+    const isOptionalNeuralAsset=HQ_FILES.some(file=>
+      new URL(file,self.location.origin+'/').pathname===new URL(req.url).pathname);
+    if(isOptionalNeuralAsset)return Response.error();
     try{
       const response=await fetch(req);
       if(response.ok)await cache.put(req,response.clone());

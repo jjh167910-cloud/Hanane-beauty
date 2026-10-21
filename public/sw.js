@@ -16,7 +16,7 @@ async function cacheOptional(cache,path){
  try{
   if(await cache.match(path))return true;
   const response=await fetch(path,{cache:'reload'});
-  if(!response.ok||response.redirected||/text\\/html/i.test(response.headers.get('content-type')||''))return false;
+  if(!response.ok||response.redirected||(response.headers.get('content-type')||'').toLowerCase().includes('text/html'))return false;
   await cache.put(path,response);return true;
  }catch{return false;}
 }

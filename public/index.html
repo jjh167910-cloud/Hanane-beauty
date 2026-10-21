@@ -75,7 +75,7 @@ function fallbackMask(image){const data=downscaleToMask(image).data;const c=docu
   im.data[i]=im.data[i+1]=im.data[i+2]=likely;im.data[i+3]=255;
  }
  x.putImageData(im,0,0);return {mask:c,face:null,estimated:true};}
-async let webHairPromise=null,webHairDisabled=false;
+let webHairPromise=null,webHairDisabled=false;
 async function getWebHairMask(image){
  if(webHairDisabled)return null;
  try{
@@ -203,7 +203,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});hand
    const d=event.data||{};
    if(d.type==='CACHE_AUDIT'){
      ready=Boolean(d.ready);badgeText();
-     message(ready?'✓ تمام '+d.total+' فایل اصلی برنامه در این دستگاه ذخیره شده‌اند.':'فقط '+d.done+' فایل از '+d.total+' فایل ذخیره شده؛ برای تکمیل، دکمه را بزنید.');
+     message(ready?'✓ تمام '+d.total+' فایل اصلی برنامه ذخیره شده‌اند. '+(d.aiReady?'بسته موتور AI نیز آفلاین ذخیره شده است؛ اجرا به قابلیت گوشی بستگی دارد.':'بسته اختیاری AI کامل نیست؛ کاتالوگ و حالت تقریبی همچنان آفلاین کار می‌کنند.'):'فقط '+d.done+' فایل از '+d.total+' فایل اصلی ذخیره شده؛ برای تکمیل، دکمه را بزنید.');
      check.disabled=false;
    }
    if(d.type==='CACHE_PROGRESS')message('در حال بررسی و ذخیره: '+d.done+' از '+d.total+' فایل…');

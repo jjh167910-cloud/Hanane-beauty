@@ -34,11 +34,11 @@ test('Identical frames preserve support mask',()=>{
 });
 test('MediaPipe two-dimensional nose/ear observations are not 3D yaw',()=>{
  const a={eyeX:.5,eyeY:.4,eyeSpan:.18,eyeRollRadians:.1,
-  noseX:.53,earPoints:[{x:.29,y:.54},{x:.75,y:.55}]};
+  noseX:.53,earPoints:[{x:.34,y:.54},{x:.78,y:.55}]};
  const obs=observationFromFaceAnchor(a,512,512);
  assert.equal(obs.ok,true);assert.equal(obs.source,'MediaPipe_2D_landmarks');
  assert.ok(Math.abs(obs.noseBias-.03/.18)<1e-9);
- assert.ok(Math.abs(obs.earBias-(.52-.5)/.18)<1e-9);
+ assert.ok(Math.abs(obs.earBias-(.56-.5)/.18)<1e-9);
  assert.equal(obs.validatedOnRealHeadGeometry,false);
 });
 test('Missing or extrapolated real landmarks fail closed',()=>{
@@ -65,4 +65,12 @@ test('Corrupt masks, weights, or training data fail closed',()=>{
  assert.throws(()=>predictPoseFlow({schema:'OFFHAIR-SYNTHETIC-POSE-FLOW-v1',
   features:FEATURE_NAMES,coefficients:[[1],[2]]},0,0,zero,zero),/Invalid/);
  assert.throws(()=>maskMetrics(new Uint8Array(2),new Uint8Array(3)),/mismatch/);
+});
+
+test('Reject real-like opposite-sign nose and ear landmark bias in joint-domain gate',()=>{
+ const face={eyeX:.5,eyeY:.4,eyeSpan:.18,eyeRollRadians:0,
+  noseX:.44,earPoints:[{x:.4,y:.5},{x:.84,y:.51}]};
+ const observation=observationFromFaceAnchor(face,512,512);
+ assert.equal(observation.ok,false);
+ assert.match(observation.reason,/joint_nose_ear_signature/);
 });

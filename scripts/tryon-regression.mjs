@@ -253,3 +253,13 @@ test('Canceling an in-flight worker revokes its old neural verification',()=>{
  assert.equal(a.run('neuralVerified'),false);
  assert.equal(a.scope.killed,1);
 });
+
+test('Unsupported Android Worker gracefully reports failure without breaking ordinary preview',async()=>{
+ const a=app();
+ a.run("neuralInstalled=true;hasResult=true;userImage={portrait:true};referenceLayer={};neuralVerified=false");
+ await a.run('testNeuralEngine()');
+ assert.equal(a.run('neuralBusy'),false);
+ assert.equal(a.run('neuralVerified'),false);
+ assert.match(a.elements.get('neuralStatus').textContent,/تست مدل موفق نبود/);
+ assert.equal(a.run('hasResult'),true);
+});

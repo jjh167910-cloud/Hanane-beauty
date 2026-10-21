@@ -140,3 +140,18 @@ test('Excessive original hair exposure yields a clear caution, not a realism cla
  a.run("updateQualityNotice({reliable:true,fraction:0})");
  assert.match(a.elements.get('qualityNotice').textContent,/پیش‌نمایش/);
 });
+
+test('Export includes the hairstyle even while viewing the before photo',()=>{
+ const a=app();a.scope.photo={width:1600,height:2400};a.scope.hair={kind:'hairstyle'};
+ a.run("selfie=photo;userImage={};referenceLayer=hair;showBefore=true;faceLayer=null;fitted={x:300,y:250,s:1,refEyeX:256,refEyeY:256,rotation:0};$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0");
+ const width=a.run("createExportCanvas().width");
+ assert.equal(width,1536);
+ assert.ok(a.draws.some(args=>args[0]===a.scope.hair));
+ assert.equal(a.run("showBefore"),true);
+});
+
+test('Smaller portrait export avoids unsupported fake 2x sharpness',()=>{
+ const a=app();a.scope.photo={width:720,height:1100};a.scope.hair={kind:'hairstyle'};
+ a.run("selfie=photo;userImage={};referenceLayer=hair;faceLayer=null;fitted={x:300,y:250,s:1,refEyeX:256,refEyeY:256,rotation:0};$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0");
+ assert.equal(a.run("createExportCanvas().width"),768);
+});

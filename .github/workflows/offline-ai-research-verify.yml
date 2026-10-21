@@ -26,6 +26,8 @@ jobs:
         run: node scripts/real-browser-inference-smoke.mjs
       - name: Run real source/reference hair difference-mask topology offline experiment
         run: node scripts/real-offhair-difference-mask-smoke.mjs
+      - name: Verify browser-local OffHair ground-truth drawing, metadata export and offline reload
+        run: node scripts/real-offhair-annotator-smoke.mjs
       - name: Build research-only MI-GAN (pinned checksum)
         run: npm run build:migan
       - name: Verify browser-only neural inpainting and airplane-mode rerun

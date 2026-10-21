@@ -1,0 +1,18 @@
+node_modules/
+.bun/
+.npm/
+.wrangler/
+.DS_Store
+*.log
+
+# Verified binary models and local inference runtimes generated at build time.
+# The static Cloudflare deployment receives these files from npm run build;
+# keep binaries out of Git history and preserve LICENSE-WEIGHTS.txt.
+public/ai/inpaint/model-part-*.bin
+public/ai/inpaint/migan_pipeline_v2.onnx
+public/ai/inpaint/bundle.json
+public/ai/inpaint/runtime/
+public/ai/models/
+public/ai/wasm/
+public/ai/vendor/
+public/ai/model-info.json

@@ -79,3 +79,17 @@ export function exposedHairFraction(original, projected, width, height) {
   return { fraction: total ? exposed / total : 0, total, exposed,
     reliable: total >= 30 };
 }
+
+
+/**
+ * Conservative photo/view mismatch guard, not 3D pose estimation.
+ * MediaPipe detects eye centers and a nose tip; significant differences in
+ * their ratios predict visually poor 2D hairstyle overlap.
+ * Unknown nose landmarks => unknown, never a false precision claim.
+ */
+export function poseCompatibility(customer,reference) {
+ const a=customer?.yaw,b=reference?.yaw;
+ if(!Number.isFinite(a)||!Number.isFinite(b))return {known:false,mismatch:false,difference:null};
+ const difference=Math.abs(a-b);
+ return {known:true,mismatch:difference>=0.34,difference};
+}

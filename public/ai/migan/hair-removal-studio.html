@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f0e7"><title>حنانه بیوتی | آزمایش واقعی پاک‌سازی مو با AI آفلاین</title>
+<style>
+:root{--paper:#fffefa;--bg:#f5f0e9;--ink:#2f271f;--quiet:#786d5f;--gold:#9a7044;--line:#e7dbca;--error:#922f2b}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--ink);font:15px/1.85 Tahoma,'Noto Sans Arabic',sans-serif;margin:0}a{color:var(--gold)}main{max-width:1080px;margin:auto;padding:26px 17px 75px}h1{font-size:clamp(24px,4vw,39px);line-height:1.4;margin:12px 0}h2{font-size:18px;margin:0 0 12px}p{color:var(--quiet);margin:10px 0}.eyebrow{letter-spacing:.05em;color:var(--gold);font-weight:700;font-size:12px}.panel{border:1px solid var(--line);background:var(--paper);border-radius:19px;padding:18px;margin:18px 0;box-shadow:0 10px 25px #543a200b}.split{display:grid;grid-template-columns:1fr 1fr;gap:16px}.viewer{min-width:0}canvas{display:block;background:#ede4d9;border:1px solid var(--line);border-radius:12px;width:100%;height:auto;aspect-ratio:1/1}.lbl{color:var(--quiet);font-size:12px;margin-bottom:8px}.actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}.btn{background:#342b23;color:white;border:0;padding:13px 19px;border-radius:12px;font:inherit;cursor:pointer}.btn.soft{background:#e9dfd2;color:#3b3127}.btn:disabled{opacity:.42;cursor:not-allowed}input[type=file]{width:100%;max-width:410px;padding:12px;border:1px dashed #ac9379;border-radius:10px}label{display:block;margin:8px 0}.inline-label{display:flex;align-items:center;gap:9px}.steps{display:flex;gap:12px;flex-wrap:wrap;color:var(--quiet);font-size:13px}.step{background:#f0e7db;padding:6px 10px;border-radius:99px}#status{font-weight:700;color:#705130;min-height:30px}#status.error{color:var(--error)}pre{direction:ltr;text-align:left;background:#ebe5dc;border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;font:12px/1.7 ui-monospace,monospace}.aside{font-size:12px;padding:12px;background:#f5e9dc;border-radius:10px}select{border:1px solid var(--line);padding:11px;border-radius:10px;background:white;max-width:100%}
+@media(max-width:650px){.split{grid-template-columns:1fr}main{padding:19px 13px 60px}.panel{padding:13px}.viewer canvas{max-width:480px;margin:auto}}
+</style></head><body><main>
+<a href="../../index.html">← بازگشت به کاتالوگ</a>
+<div class="eyebrow">HANANEH BEAUTY · OFFLINE RESEARCH</div>
+<h1>بازسازی آزمایشی موی قبلی، کاملاً روی دستگاه</h1>
+<p>مرحلهٔ اول: MediaPipe موی تصویر را جدا می‌کند. مرحلهٔ دوم: مدل MI-GAN تلاش می‌کند ناحیهٔ انتخاب‌شده را بازسازی کند. ناحیهٔ صورت محافظت می‌شود. این ابزار مدل موی جدید تولید نمی‌کند و برای ارائهٔ نتیجهٔ نهایی به مشتری تأیید نشده است.</p>
+<div class="steps"><span class="step">۱. تصویر</span><span class="step">۲. تشخیص و بررسی ماسک</span><span class="step">۳. بازسازی محلی</span></div>
+<section class="panel"><h2>۱. عکس آزمایشی یا تصویر شما</h2>
+<div class="actions"><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" aria-label="انتخاب عکس">
+<select id="sample" aria-label="نمونه‌های داخل کاتالوگ"><option value="">نمونهٔ کاتالوگ (بدون ارسال اینترنتی)</option>
+<option value="1">مدل ۱ · کوتاه</option><option value="2">مدل ۲ · پیکسی</option><option value="3">مدل ۳ · فر کوتاه</option><option value="6">مدل ۶ · پیکسی</option><option value="9">مدل ۹</option></select></div>
+<p class="aside">عکس در مرورگر دستگاه باقی می‌ماند و پس از بستن صفحه ذخیره نمی‌شود. تصویر پیش‌نمایش برای اجرای مدل به ۵۱۲×۵۱۲ کاهش می‌یابد؛ تصویر کامل در خروجی تحقیقاتی ذخیره نمی‌شود.</p></section>
+<section class="panel"><h2>۲. تشخیص مو و بررسی ایمنی</h2>
+<div class="actions"><button class="btn" id="analyze" disabled>تشخیص موی واقعی با AI</button><button class="btn soft" id="clear" type="button">پاک کردن تصویر و نتیجه</button></div>
+<p class="aside">ماسک باید با تشخیص واقعی چهره همراه باشد. اگر چشم‌ها مشخص نباشند یا ماسک خیلی گسترده باشد، حذف مو انجام نمی‌شود.</p>
+<div class="split"><div class="viewer"><div class="lbl">عکس اصلی</div><canvas id="portrait" width="512" height="512"></canvas></div><div class="viewer"><div class="lbl">ماسک پیشنهادی؛ قرمز = ناحیه حذف</div><canvas id="mask" width="512" height="512"></canvas></div></div></section>
+<section class="panel"><h2>۳. بازسازی پس‌زمینه با مدل عصبی</h2>
+<label class="inline-label"><input id="approve" type="checkbox" disabled> ماسک تشخیص‌داده‌شده را بررسی کردم و می‌پذیرم که تصویر فقط برای آزمایش پردازش شود.</label>
+<div class="actions"><button id="run" class="btn" disabled>اجرای بازسازی عصبی آفلاین</button><button class="btn soft" id="download" disabled>ذخیره خروجی آزمایشی</button></div>
+<div class="split"><div class="viewer"><div class="lbl">قبل از بازسازی</div><canvas id="before" width="512" height="512"></canvas></div>
+<div class="viewer"><div class="lbl">بعد از بازسازی (بدون مدل موی جدید)</div><canvas id="after" width="512" height="512"></canvas></div></div>
+<p id="status" role="status" aria-live="polite">یک تصویر محلی برای شروع انتخاب کنید.</p><pre id="metrics">Offline mode · no portrait upload · commercial release NOT approved</pre></section>
+</main><script src="../../data/pack-01.js"></script><script src="./ort/ort.min.js"></script><script type="module">
+import {getLocalHairSegmenter} from '../hair-segmenter.mjs';
+import {prepareHairRemoval,composeInpaintedRGBA} from './hair-removal-core.mjs';
+const S=512,N=S*S,$=id=>document.getElementById(id);
+let imageData=null,proposal=null,token=0,sessionPromise=null;
+let originalCanvas=$('portrait'),maskCanvas=$('mask'),beforeCanvas=$('before'),afterCanvas=$('after');
+const clearCanvas=c=>{const x=c.getContext('2d');x.clearRect(0,0,S,S);x.fillStyle='#f1e5d7';x.fillRect(0,0,S,S)};
+function status(t,error=false){$('status').textContent=t;$('status').className=error?'error':'';}
+function dropResult(){proposal=null;$('run').disabled=true;$('approve').disabled=true;$('approve').checked=false;$('download').disabled=true;window.__hananehHairStage=null;clearCanvas(maskCanvas);clearCanvas(afterCanvas);}
+function reset(){token++;imageData=null;originalCanvas.getContext('2d').clearRect(0,0,S,S);for(const c of [originalCanvas,beforeCanvas])clearCanvas(c);dropResult();$('analyze').disabled=true;$('photo').value='';$('sample').value='';status('یک تصویر محلی برای شروع انتخاب کنید.');$('metrics').textContent='Ready';}
+$('clear').addEventListener('click',reset);reset();
+async function loadLocalImage(src){
+ const key=++token;dropResult();
+ const img=new Image();img.decoding='async';
+ try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('فایل تصویری قابل خواندن نیست'));img.src=src;});}
+ catch(e){if(key===token)status(e.message,true);return;}
+ if(key!==token)return;
+ const ctx=originalCanvas.getContext('2d',{willReadFrequently:true});
+ ctx.fillStyle='#eee6dc';ctx.fillRect(0,0,S,S);
+ const scale=Math.min(S/img.naturalWidth,S/img.naturalHeight);
+ const w=img.naturalWidth*scale,h=img.naturalHeight*scale;
+ ctx.drawImage(img,(S-w)/2,(S-h)/2,w,h);
+ imageData=ctx.getImageData(0,0,S,S);beforeCanvas.getContext('2d').putImageData(imageData,0,0);
+ $('analyze').disabled=false;status('عکس آماده است. تشخیص مو را اجرا کنید.');
+}
+$('photo').addEventListener('change',async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>12*1024*1024){reset();status('عکس نامعتبر یا بیش از ۱۲ مگابایت است.',true);return;}
+ const url=URL.createObjectURL(file);try{await loadLocalImage(url);}finally{URL.revokeObjectURL(url);}
+});
+$('sample').addEventListener('change',async e=>{
+ const data=window.OFFLINE_IMAGES?.[e.target.value];
+ if(!data){status('این تصویر نمونه در بستهٔ آفلاین موجود نیست.',true);return;}
+ await loadLocalImage(data);
+});
+async function analyze(){
+ if(!imageData)return;
+ const key=token;$('analyze').disabled=true;dropResult();status('مدل تشخیص موی کاملاً محلی در حال اجرا است...');
+ try{
+  const engine=await getLocalHairSegmenter();
+  const analysis=engine.analyze(originalCanvas);
+  if(key!==token)return;
+  if(!analysis.mask)throw Error('مدل مو را با اطمینان کافی تشخیص نداد.');
+  const c=document.createElement('canvas');c.width=c.height=S;
+  const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(analysis.mask,0,0,S,S);
+  const result=prepareHairRemoval(ctx.getImageData(0,0,S,S).data,S,S,analysis.face);
+  if(!result.ok)throw Error('پردازش ایمن نیست: '+result.reason);
+  proposal=result;
+  const copy=new ImageData(new Uint8ClampedArray(imageData.data),S,S);
+  for(let i=0;i<N;i++)if(proposal.keepMask[i]===0){
+   const k=i*4;copy.data[k]=214;copy.data[k+1]=67;copy.data[k+2]=54;
+  }
+  maskCanvas.getContext('2d').putImageData(copy,0,0);
+  $('approve').disabled=false;status('ماسک پیشنهاد شد. پیش از ادامه قسمت قرمز و حفاظت از صورت را بررسی کنید.');
+  $('metrics').textContent=JSON.stringify({hairPixels:result.hairPixels,coveragePercent:+(result.areaFraction*100).toFixed(2),protectedPixels:result.protectedPixels,faceAnchored:true,remoteRequests:0},null,2);
+ }catch(error){proposal=null;status(String(error.message||error),true);}
+ finally{if(key===token)$('analyze').disabled=false;}
+}
+$('analyze').addEventListener('click',analyze);
+$('approve').addEventListener('change',()=>{$('run').disabled=!(proposal&&$('approve').checked);});
+async function bytes(){
+ const info=await (await fetch('./model-manifest.json')).json(),buf=new Uint8Array(info.size);let p=0;
+ for(const part of info.parts){
+  const response=await fetch('./parts/'+part.name);if(!response.ok)throw Error('Missing offline model asset '+part.name);
+  const chunk=new Uint8Array(await response.arrayBuffer());
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',chunk))).map(x=>x.toString(16).padStart(2,'0')).join('');
+  if(chunk.length!==part.bytes||digest!==part.sha256)throw Error('Model part failed checksum: '+part.name);
+  buf.set(chunk,p);p+=chunk.length;
+ }
+ if(p!==buf.length)throw Error('Model incomplete');
+ const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buf))).map(x=>x.toString(16).padStart(2,'0')).join('');
+ if(digest!==info.model_sha256)throw Error('Whole model checksum mismatch');
+ return buf;
+}
+async function getSession(){
+ if(!sessionPromise)sessionPromise=(async()=>{
+  if(!globalThis.ort)throw Error('Offline ONNX Runtime Web not installed');
+  ort.env.wasm.wasmPaths=new URL('./ort/',location.href).href;
+  ort.env.wasm.numThreads=self.crossOriginIsolated?Math.min(4,navigator.hardwareConcurrency||2):1;
+  return ort.InferenceSession.create(await bytes(),{executionProviders:['wasm']});
+ })().catch(e=>{sessionPromise=null;throw e});
+ return sessionPromise;
+}
+async function inpaint(){
+ if(!imageData||!proposal||!$('approve').checked)return;
+ const key=token;$('run').disabled=true;status('مدل MI-GAN در حال بازسازی محلی است...');
+ try{
+  const start=performance.now(),session=await getSession();
+  if(key!==token)return;
+  const rgb=new Uint8Array(N*3);
+  for(let i=0;i<N;i++)for(let c=0;c<3;c++)rgb[c*N+i]=imageData.data[i*4+c];
+  const feed={image:new ort.Tensor('uint8',rgb,[1,3,S,S]),
+              mask:new ort.Tensor('uint8',proposal.keepMask,[1,1,S,S])};
+  const t=performance.now(),pred=await session.run(feed);if(key!==token)return;
+  const output=pred[session.outputNames[0]];
+  if(output.type!=='uint8'||output.dims.join(',')!=='1,3,512,512')throw Error('Unexpected neural tensor');
+  const composite=composeInpaintedRGBA(imageData.data,output.data,proposal.keepMask,S,S);
+  afterCanvas.getContext('2d').putImageData(new ImageData(composite.rgba,S,S),0,0);
+  $('download').disabled=false;status('بازسازی عصبی آفلاین انجام شد. این تصویر، انتقال مدل موی جدید نیست.');
+  const proof={realSegmentation:true,realInpainting:true,generatedHair:false,
+    removedPixels:proposal.hairPixels,changedChannels:composite.changedChannels,
+    inferenceMs:Math.round(performance.now()-t),totalMs:Math.round(performance.now()-start),
+    faceOutsideMaskPreserved:true,crossOriginIsolated:self.crossOriginIsolated,
+    model:'MI-GAN 512',privacy:'no customer image uploaded'};
+  $('metrics').textContent=JSON.stringify(proof,null,2);
+  window.__hananehHairStage=proof;
+ }catch(e){status('مدل آفلاین اجرا نشد: '+e.message,true);window.__hananehHairStage={error:String(e)};}
+ finally{if(key===token)$('run').disabled=!(proposal&&$('approve').checked);}
+}
+$('run').addEventListener('click',inpaint);
+$('download').addEventListener('click',()=>{
+ const a=document.createElement('a');a.href=afterCanvas.toDataURL('image/png');a.download='hananeh-hair-removal-research.png';a.click();
+});
+</script></body></html>

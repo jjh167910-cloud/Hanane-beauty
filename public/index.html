@@ -7,7 +7,7 @@
 <section class="panel tryon" id="tryon"><div class="section-title"><div><span class="eyebrow">VIRTUAL TRY-ON</span><h2>امتحان روی چهره من</h2></div><span class="section-no">01 / 03</span></div><p class="hint">یک سلفی واضح و روبه‌رو با نور مناسب نتیجه بهتری می‌دهد. تصویر شما فقط روی همین دستگاه پردازش می‌شود.</p>
 <div class="upload-row"><label class="upload"><input id="photoInput" type="file" accept="image/*"><span class="upicon">↥</span><strong id="uploadLabel">انتخاب عکس از گوشی</strong><small>JPG / PNG · بهترین نتیجه: چهره روبه‌رو</small></label><div class="chosen" id="chosen"><img src="" alt="مدل انتخاب شده" id="chosenThumb" style="display:none"><div><small>مدل انتخابی</small><b id="chosenTitle">هنوز مدلی انتخاب نشده</b><span id="chosenCode"></span></div></div></div>
 <div class="preview-area"><div class="preview-head"><strong>پیش‌نمایش شخصی</strong><button class="textbtn" id="toggleBefore" type="button">نمایش عکس اصلی</button></div><div class="canvas-frame" id="canvasFrame"><canvas id="resultCanvas" width="768" height="960" aria-label="پیش‌نمایش مدل مو"></canvas><div class="canvas-placeholder" id="canvasPlaceholder"><div class="face-illu">✧</div><strong>پیش‌نمایش شما اینجا نمایش داده می‌شود</strong><p>یک مدل انتخاب کنید و عکس خودتان را اضافه کنید؛ پیش‌نمایش خودکار ساخته می‌شود.</p></div></div><p id="qualityNotice" class="quality-note" role="status" aria-live="polite">این ابزار یک پیش‌نمایش مشاوره‌ای است؛ برای تغییر واقعی حجم یا کوتاهی مو به بازسازی مولد تصویر نیاز است.</p><p class="privacy">تصاویر به هیچ سروری ارسال نمی‌شوند. پیش‌نمایش، شبیه‌سازی است و ممکن است کاملاً طبیعی نباشد.</p></div>
-<div class="controls"><label class="face-protect"><input id="protectFace" type="checkbox" checked>حفظ اجزای چهره (در صورت تشخیص صورت)</label><div class="control-title"><b>تنظیم دقیق استایل</b><span>برای انطباق خط رویش و حجم مو</span></div><label>اندازه <input id="scaleRange" type="range" min="60" max="160" value="100" step="1"></label><label>جابه‌جایی افقی <input id="xRange" type="range" min="-180" max="180" value="0" step="1"></label><label>جابه‌جایی عمودی <input id="yRange" type="range" min="-180" max="180" value="0" step="1"></label><label>چرخش <input id="rotRange" type="range" min="-25" max="25" value="0" step="1"></label><div class="control-actions"><button id="generateBtn" class="primary" disabled>ساخت پیش‌نمایش</button><button id="resetBtn" class="secondary" type="button">بازنشانی تنظیمات</button><button id="saveBtn" class="secondary" type="button" disabled>ذخیره نتیجه</button></div><div id="progress" class="progress" role="status" aria-live="polite">ابتدا عکس و مدل مو را انتخاب کنید.</div></div></section>
+<div class="controls"><label class="face-protect"><input id="protectFace" type="checkbox" checked>حفظ اجزای چهره (در صورت تشخیص صورت)</label><label class="face-protect"><input id="repairHair" type="checkbox" checked>ترمیم محدود موهای باقی‌مانده (آزمایشی، فقط پس‌زمینه ساده)</label><div class="control-title"><b>تنظیم دقیق استایل</b><span>برای انطباق خط رویش و حجم مو</span></div><label>اندازه <input id="scaleRange" type="range" min="60" max="160" value="100" step="1"></label><label>جابه‌جایی افقی <input id="xRange" type="range" min="-180" max="180" value="0" step="1"></label><label>جابه‌جایی عمودی <input id="yRange" type="range" min="-180" max="180" value="0" step="1"></label><label>چرخش <input id="rotRange" type="range" min="-25" max="25" value="0" step="1"></label><div class="control-actions"><button id="generateBtn" class="primary" disabled>ساخت پیش‌نمایش</button><button id="resetBtn" class="secondary" type="button">بازنشانی تنظیمات</button><button id="saveBtn" class="secondary" type="button" disabled>ذخیره نتیجه</button></div><div id="progress" class="progress" role="status" aria-live="polite">ابتدا عکس و مدل مو را انتخاب کنید.</div></div></section>
 <section class="panel" id="styles"><div class="section-title"><div><span class="eyebrow">STYLE COLLECTION</span><h2>بانک مدل‌های مو</h2></div><span class="section-no">02 / 03</span></div><p class="hint">مدل‌های بسیار مشابه در یک خانواده جمع شده‌اند. برای هر مدل چند نسخه در صورت وجود در دسترس است.</p><label class="search"><span>⌕</span><input id="search" type="search" placeholder="جست‌وجو: باب، پیکسی، شینیون، بافت..."></label><div class="chips" id="chips"></div><div id="count" class="count">در حال بارگذاری مدل‌ها...</div><div class="style-grid" id="styleGrid"></div><button class="loadmore" type="button" id="moreBtn">نمایش مدل‌های بیشتر</button></section>
 <section class="panel notes"><div class="section-title"><div><span class="eyebrow">PRIVATE BY DESIGN</span><h2>حریم خصوصی و کیفیت</h2></div><span class="section-no">03 / 03</span></div><div class="note-grid"><article><span>01</span><b>همه‌چیز روی گوشی</b><p>عکس شما روی همین دستگاه پردازش می‌شود و به سرور ارسال نمی‌شود.</p></article><article><span>02</span><b>پیش‌نمایش تقریبی مدل مو</b><p>این نسخه از هم‌گذاری تصویری تقریبی استفاده می‌کند و موتور تولید تصویر یا مدل هوش مصنوعی مو در آن نصب نشده است.</p></article><article><span>03</span><b>نتیجه قابل تنظیم</b><p>جاگذاری خودکار اولیه همراه با جابه‌جایی، تغییر اندازه و چرخش برای هماهنگی بیشتر.</p></article></div></section>
 </main><nav class="bottomnav"><a href="#tryon"><span>◉</span>امتحان</a><a href="#styles"><span>▦</span>مدل‌ها</a><a href="#top" id="topLink"><span>⌂</span>خانه</a></nav>
@@ -36,7 +36,7 @@ const arNum=n=>new Intl.NumberFormat('fa-IR').format(n);
 const categoryNames={all:'همه',pixie:'پیکسی و کوتاه',bob:'باب و لاب',long:'موی بلند',waves:'موج و ویو',curly:'فر',updo:'شینیون',braids:'بافت',ponytail:'دم‌اسبی',color:'رنگ و هایلایت',modern:'مدرن'};
 let catalog=[], filtered=[], selected=null, selectedVariant=0, selfie=null, userMask=null, referenceMask=null;
 let faceUser=null,faceRef=null, showBefore=false, hasResult=false, currentCat='all', search='', countVisible=30;
-let refImage=null,userImage=null,referenceLayer=null,faceLayer=null,qualityCore=null,maskBounds=null;
+let refImage=null,userImage=null,referenceLayer=null,faceLayer=null,repairLayer=null,qualityCore=null,repairCore=null,repairStats=null,maskBounds=null;
 let inputRevision=0,uploadRevision=0;
 let browsingStyle=null,browsingVariant=0;
 let loadingPhoto=false,previewQueued=false;
@@ -131,20 +131,51 @@ function makeProtectedFaceLayer(){
  layer.putImageData(frame,0,0);
  return canvas;
 }
-function assessOriginalHair(){
+function renderHairMaskComparison(){
  if(!qualityCore||!userMask?.mask||!referenceMask?.mask||!userImage||
-     userMask.estimated||referenceMask.estimated)return null;
+    userMask.estimated||referenceMask.estimated)return null;
  const w=384,h=480;
  const create=()=>{const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;return canvas.getContext('2d',{willReadFrequently:true})};
  const source=create(),target=create();
  source.drawImage(userMask.mask,0,0,w,h);
  target.save();
- target.translate(fitted.x*.5,fitted.y*.5);
- target.rotate(fitted.rotation||0);
- target.scale(fitted.s*.5,fitted.s*.5);
+ target.translate((fitted.x+numeric('xRange'))*.5,(fitted.y+numeric('yRange'))*.5);
+ target.rotate((fitted.rotation||0)+numeric('rotRange')*Math.PI/180);
+ target.scale(fitted.s*.5*numeric('scaleRange')/100,fitted.s*.5*numeric('scaleRange')/100);
  target.drawImage(referenceMask.mask,-fitted.refEyeX,-fitted.refEyeY,512,512);
  target.restore();
- return qualityCore.exposedHairFraction(source.getImageData(0,0,w,h).data,target.getImageData(0,0,w,h).data,w,h);
+ return {w,h,original:source.getImageData(0,0,w,h).data,
+         projected:target.getImageData(0,0,w,h).data};
+}
+function refreshVisualQuality(){
+ repairLayer=null;repairStats=null;
+ let masks=null,report=null;
+ try{masks=renderHairMaskComparison();
+  if(masks)report=qualityCore.exposedHairFraction(masks.original,masks.projected,masks.w,masks.h);
+ }catch(e){console.warn('Hair exposure metric unavailable:',e);}
+ // Never synthesize an unrecognized person's background. Face guidance, an
+ // actual hair model and uniform surrounding color are all required.
+ if(masks&&faceUser&&repairCore&&$('repairHair').checked){
+  try{
+   const photo=document.createElement('canvas');photo.width=masks.w;photo.height=masks.h;
+   const x=photo.getContext('2d',{willReadFrequently:true});
+   x.drawImage(userImage,0,0,masks.w,masks.h);
+   const pixels=x.getImageData(0,0,masks.w,masks.h).data;
+   const protectedFace=qualityCore.faceProtectionAlpha(masks.w,masks.h,faceUser);
+   // Check for a valid face-guard raster before attempting inpainting.
+   if(protectedFace.some(a=>a>=200)){
+    repairStats=repairCore.repairSmallHairPatches(pixels,masks.original,masks.projected,protectedFace,masks.w,masks.h);
+    if(repairStats.corrected>0){
+     const fill=document.createElement('canvas');fill.width=masks.w;fill.height=masks.h;
+     const cx=fill.getContext('2d');
+     const data=cx.createImageData(masks.w,masks.h);
+     data.data.set(repairStats.patch);cx.putImageData(data,0,0);repairLayer=fill;
+    }
+   }
+  }catch(e){console.warn('Conservative hair repair unavailable:',e);repairLayer=null;repairStats=null;}
+ }
+ updateQualityNotice(report);
+ return report;
 }
 function updateQualityNotice(report){
  const note=$('qualityNotice');
@@ -155,12 +186,13 @@ function updateQualityNotice(report){
  }else if(report?.reliable&&report.fraction>=.16){
   note.textContent='ممکن است بخش‌هایی از موهای فعلی اطراف مدل جدید باقی بمانند؛ موقعیت را تنظیم کنید و نتیجه را واقعی تلقی نکنید.';
  }else{
-  note.textContent='برای طبیعی‌تر شدن، چهره شما حفظ می‌شود. این پیش‌نمایش هنوز جایگزینی مولد مو نیست و ممکن است خط رویش واقعی نباشد.';
+  note.textContent=repairStats?.corrected>0?'ترمیم محدود بخش‌هایی از مو روی پس‌زمینه ساده انجام شد. نتیجه همچنان شبیه‌سازی است و ممکن است با واقعیت تفاوت داشته باشد.':'برای طبیعی‌تر شدن، چهره شما حفظ می‌شود. این پیش‌نمایش هنوز جایگزینی مولد مو نیست و ممکن است خط رویش واقعی نباشد.';
  }
 }
 function drawResult(){
  drawUser();
  if(showBefore||!referenceLayer||!userImage)return;
+ if(repairLayer&&$('repairHair').checked)ctx.drawImage(repairLayer,0,0,PREVIEW_W,PREVIEW_H);
  ctx.save();
  ctx.translate(fitted.x+numeric('xRange'),fitted.y+numeric('yRange'));
  ctx.rotate((fitted.rotation||0)+numeric('rotRange')*Math.PI/180);
@@ -192,13 +224,13 @@ async function generate(){if(busy||loadingPhoto||!userImage||!selected)return;co
   userMask=nextUserMask;faceUser=userMask.face;refImage=nextRefImage;referenceMask=nextReferenceMask;faceRef=referenceMask.face;
   try{qualityCore=qualityCore||await import('./ai/quality-core.mjs');}
   catch(e){console.warn('Optional compositor quality helpers unavailable:',e);}
+  try{repairCore=repairCore||await import('./ai/residual-hair-repair.mjs');}
+  catch(e){console.warn('Optional conservative hair repair unavailable:',e);}
   if(revision!==inputRevision)return;
   referenceLayer=createHairLayer(refImage,referenceMask.mask);fitTransform();
   // Unsupported face and uncertain masks fall back to the original safe overlay.
   try{faceLayer=makeProtectedFaceLayer();}catch(e){console.warn('Face-preservation raster unavailable:',e);faceLayer=null;}
-  let report=null;
-  try{report=assessOriginalHair();}catch(e){console.warn('Hair overlap could not be scored:',e);}
-  updateQualityNotice(report);
+  refreshVisualQuality();
   $('canvasPlaceholder').style.display='none';drawResult();hasResult=true;
   $('saveBtn').disabled=false;
   setProgress(native?'پیش‌نمایش با استخراج AI مو آماده است. در صورت نیاز جایگذاری را تنظیم کنید.':(!userMask.estimated&&!referenceMask.estimated?'پیش‌نمایش با استخراج موی AI آفلاین آماده است؛ مدل مو هنوز فقط ترکیب تصویری است.':'پیش‌نمایش تقریبی آماده است؛ موتور تشخیص مو در این دستگاه در دسترس نیست.'));
@@ -209,7 +241,7 @@ async function uploadFile(file){if(!file)return;
  // A failed replacement must never leave an old customer's photo or export on screen.
  const upload=++uploadRevision;++inputRevision;
  loadingPhoto=false;userImage=null;selfie=null;userMask=null;faceUser=null;
- hasResult=false;referenceLayer=null;faceLayer=null;showBefore=false;previewQueued=false;$('qualityNotice').textContent='یک سلفی واضح و مدل مو انتخاب کنید.';
+ hasResult=false;referenceLayer=null;faceLayer=null;repairLayer=null;repairStats=null;showBefore=false;previewQueued=false;$('qualityNotice').textContent='یک سلفی واضح و مدل مو انتخاب کنید.';
  $('saveBtn').disabled=true;$('toggleBefore').textContent='نمایش عکس اصلی';
  $('uploadLabel').textContent='انتخاب عکس از گوشی';
  $('canvasPlaceholder').style.display='flex';drawUser();updateBtn();
@@ -248,6 +280,7 @@ function createExportCanvas(){
   const pw=photoWidth*k,ph=photoHeight*k;
   c.drawImage(selfie,(w-pw)/2,(h-ph)/2,pw,ph);
  }else if(userImage)c.drawImage(userImage,0,0,w,h);
+ if(repairLayer&&$('repairHair').checked)c.drawImage(repairLayer,0,0,w,h);
  if(referenceLayer){
   c.save();
   c.translate((fitted.x+numeric('xRange'))*factor,(fitted.y+numeric('yRange'))*factor);
@@ -304,16 +337,24 @@ function renderGrid(){const visible=filtered.slice(0,countVisible);$('count').te
 function openStyle(id){browsingStyle=catalog.find(f=>f.id===Number(id));if(!browsingStyle)return;browsingVariant=0;paintSheet();$('styleSheet').classList.add('open');$('styleSheet').setAttribute('aria-hidden','false');}
 function paintSheet(){$('sheetImage').src=imgPath(browsingStyle.variantIds[browsingVariant],'full');$('sheetTitle').textContent=browsingStyle.variantNames[browsingVariant]||browsingStyle.name;$('sheetCode').textContent=browsingStyle.code;$('sheetDescription').textContent=browsingStyle.description||'این مدل به‌عنوان یک استایل مستقل در بانک حنانه بیوتی ثبت شده است.';$('variants').innerHTML=browsingStyle.variantIds.map((id,i)=>`<button type="button" class="variant ${i===browsingVariant?'active':''}" data-variant="${i}"><img src="${imgPath(id)}" alt="${browsingStyle.variantNames[i]}">${browsingStyle.variantNames[i]}</button>`).join('');}
 function closeSheet(){$('styleSheet').classList.remove('open');$('styleSheet').setAttribute('aria-hidden','true');}
-function chooseStyle(){if(!browsingStyle)return;selected=browsingStyle;selectedVariant=browsingVariant;++inputRevision;refImage=null;referenceLayer=null;faceLayer=null;hasResult=false;$('qualityNotice').textContent='در حال آماده‌سازی پیش‌نمایش استایل جدید…';$('saveBtn').disabled=true;$('chosenThumb').src=imgPath(selected.variantIds[selectedVariant]);$('chosenThumb').style.display='block';$('chosenTitle').textContent=selected.variantNames[selectedVariant]||selected.name;$('chosenCode').textContent=selected.code;closeSheet();showBefore=false;resetControls();drawUser();updateBtn();setProgress(userImage?'در حال امتحان مدل روی عکس شما…':'مدل انتخاب شد. یک عکس واضح و روبه‌رو از خودتان انتخاب کنید.');document.getElementById('tryon').scrollIntoView({behavior:'smooth'});if(userImage)requestPreview();else if(!loadingPhoto)$('photoInput').click();}
-function resetControls(){['scaleRange','xRange','yRange','rotRange'].forEach((id,i)=>$(id).value=i===0?100:0);if(hasResult)drawResult();}
-function handleDrag(){let previous=null;resultCanvas.addEventListener('pointerdown',e=>{if(!hasResult)return;previous={x:e.clientX,y:e.clientY};resultCanvas.setPointerCapture(e.pointerId);});resultCanvas.addEventListener('pointermove',e=>{if(!previous)return;const rc=resultCanvas.getBoundingClientRect();const dx=(e.clientX-previous.x)*PREVIEW_W/rc.width;const dy=(e.clientY-previous.y)*PREVIEW_H/rc.height; $('xRange').value=Math.max(-180,Math.min(180,numeric('xRange')+dx));$('yRange').value=Math.max(-180,Math.min(180,numeric('yRange')+dy));previous={x:e.clientX,y:e.clientY};drawResult();});for(const event of ['pointerup','pointercancel'])resultCanvas.addEventListener(event,()=>previous=null);}
+function chooseStyle(){if(!browsingStyle)return;selected=browsingStyle;selectedVariant=browsingVariant;++inputRevision;refImage=null;referenceLayer=null;faceLayer=null;repairLayer=null;repairStats=null;hasResult=false;$('qualityNotice').textContent='در حال آماده‌سازی پیش‌نمایش استایل جدید…';$('saveBtn').disabled=true;$('chosenThumb').src=imgPath(selected.variantIds[selectedVariant]);$('chosenThumb').style.display='block';$('chosenTitle').textContent=selected.variantNames[selectedVariant]||selected.name;$('chosenCode').textContent=selected.code;closeSheet();showBefore=false;resetControls();drawUser();updateBtn();setProgress(userImage?'در حال امتحان مدل روی عکس شما…':'مدل انتخاب شد. یک عکس واضح و روبه‌رو از خودتان انتخاب کنید.');document.getElementById('tryon').scrollIntoView({behavior:'smooth'});if(userImage)requestPreview();else if(!loadingPhoto)$('photoInput').click();}
+function resetControls(){['scaleRange','xRange','yRange','rotRange'].forEach((id,i)=>$(id).value=i===0?100:0);if(hasResult){refreshVisualQuality();drawResult();}}
+function handleDrag(){let previous=null;resultCanvas.addEventListener('pointerdown',e=>{if(!hasResult)return;previous={x:e.clientX,y:e.clientY};resultCanvas.setPointerCapture(e.pointerId);});resultCanvas.addEventListener('pointermove',e=>{if(!previous)return;const rc=resultCanvas.getBoundingClientRect();const dx=(e.clientX-previous.x)*PREVIEW_W/rc.width;const dy=(e.clientY-previous.y)*PREVIEW_H/rc.height; $('xRange').value=Math.max(-180,Math.min(180,numeric('xRange')+dx));$('yRange').value=Math.max(-180,Math.min(180,numeric('yRange')+dy));previous={x:e.clientX,y:e.clientY};drawResult();});for(const event of ['pointerup','pointercancel'])resultCanvas.addEventListener(event,()=>{
+ if(previous&&hasResult){refreshVisualQuality();drawResult();}previous=null;
+ });}
 async function init(){try{const r={ok:true,json:async()=>window.OFFLINE_CATALOG};if(!r.ok)throw Error('catalog.json unavailable');catalog=await r.json();renderChips();filterStyles();}catch(e){setProgress('بارگذاری کاتالوگ با مشکل روبه‌رو شد. برنامه را از نسخه نصب‌شده اندروید اجرا کنید.');$('count').textContent='کاتالوگ در دسترس نیست';}}
 $('photoInput').addEventListener('change',e=>{const file=e.target.files&&e.target.files[0];e.target.value='';uploadFile(file);});
 $('heroTry').addEventListener('click',()=>$('tryon').scrollIntoView({behavior:'smooth'}));
 $('generateBtn').addEventListener('click',requestPreview);
 $('toggleBefore').addEventListener('click',()=>{showBefore=!showBefore;$('toggleBefore').textContent=showBefore?'نمایش نتیجه':'نمایش عکس اصلی';drawResult();});
-$('resetBtn').addEventListener('click',resetControls);$('protectFace').addEventListener('change',()=>{if(hasResult)drawResult();});$('saveBtn').addEventListener('click',save);
-for(const id of ['scaleRange','xRange','yRange','rotRange'])$(id).addEventListener('input',()=>{if(hasResult)drawResult();});
+$('resetBtn').addEventListener('click',resetControls);
+$('protectFace').addEventListener('change',()=>{if(hasResult)drawResult();});
+$('repairHair').addEventListener('change',()=>{if(hasResult){refreshVisualQuality();drawResult();}});
+$('saveBtn').addEventListener('click',save);
+for(const id of ['scaleRange','xRange','yRange','rotRange']){
+ $(id).addEventListener('input',()=>{if(hasResult){repairLayer=null;drawResult();}});
+ $(id).addEventListener('change',()=>{if(hasResult){refreshVisualQuality();drawResult();}});
+}
 $('search').addEventListener('input',e=>{search=normalizeFarsi(e.target.value);filterStyles();});
 $('chips').addEventListener('click',e=>{const t=e.target.closest('[data-cat]');if(!t)return;currentCat=t.dataset.cat;renderChips();filterStyles();});
 $('styleGrid').addEventListener('click',e=>{const t=e.target.closest('[data-id]');if(t)openStyle(t.dataset.id);});

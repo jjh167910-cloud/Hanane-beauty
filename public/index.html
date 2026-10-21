@@ -531,7 +531,7 @@ $('neuralInstall').addEventListener('click',()=>{
  neuralBusy=true;updateNeuralButtons();neuralMessage('در حال دریافت بسته آفلاین...');postHQ('HQ_PREPARE');
 });
 $('neuralRun').addEventListener('click',()=>runNeuralHairRepair());
-window.addEventListener('pagehide',()=>{if(neuralBusy||neuralWorker)cancelNeuralInference();});
+if(typeof window.addEventListener==='function')window.addEventListener('pagehide',()=>{if(neuralBusy||neuralWorker)cancelNeuralInference();});
 $('resetBtn').addEventListener('click',resetControls);
 $('protectFace').addEventListener('change',()=>{if(hasResult)drawResult();});
 $('repairHair').addEventListener('change',()=>{if(hasResult){refreshVisualQuality();drawResult();}});

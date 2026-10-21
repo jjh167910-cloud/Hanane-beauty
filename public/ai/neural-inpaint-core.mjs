@@ -52,20 +52,46 @@ export function imageDataToCHW(data,width,height){
  return chw;
 }
 
-/** Convert CHW result to a transparent patch, changing only approved holes. */
+/**
+ * Composite the neural reconstruction with a short distance-to-boundary
+ * feather. Unlike an abrupt one-pixel blend, this avoids visible rectangular
+ * seams across salon lighting gradients and naturally soft hair silhouettes.
+ * The known/input area is always fully transparent; face-protected regions
+ * remain untouched. This is blending, not synthetic hairstyle generation.
+ */
 export function neuralOutputToRGBA(chw,knownMask,width,height){
  const n=width*height;
- if(chw?.length!==n*3||knownMask?.length!==n)throw new TypeError('Invalid neural output');
+ if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||
+    n>1024*1024||chw?.length!==n*3||knownMask?.length!==n)
+   throw new TypeError('Invalid neural output');
  const rgba=new Uint8ClampedArray(n*4);
+ // Compact Manhattan-distance ramp; at most 6 pixels within erased regions.
+ // Uint8Array keeps mobile memory bounded (262 KiB for a 512px model).
+ const distance=new Uint8Array(n),maxFeather=6;
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
   const i=y*width+x;
   if(knownMask[i])continue;
-  // Slight feathering protects a hard seam from 512px GAN output.
-  let boundary=false;
-  if(x===0||x===width-1||y===0||y===height-1)boundary=true;
-  else boundary=!!(knownMask[i-1]||knownMask[i+1]||knownMask[i-width]||knownMask[i+width]);
-  rgba[i*4]=chw[i];rgba[i*4+1]=chw[n+i];rgba[i*4+2]=chw[2*n+i];
-  rgba[i*4+3]=boundary?165:255;
+  let d=maxFeather;
+  if(x===0||y===0||x===width-1||y===height-1)d=1;
+  if(x&&distance[i-1]&&distance[i-1]+1<d)d=distance[i-1]+1;
+  if(y&&distance[i-width]&&distance[i-width]+1<d)d=distance[i-width]+1;
+  if(x&&knownMask[i-1])d=1;
+  if(y&&knownMask[i-width])d=1;
+  distance[i]=d;
+ }
+ for(let y=height-1;y>=0;y--)for(let x=width-1;x>=0;x--){
+  const i=y*width+x;
+  if(knownMask[i])continue;
+  let d=distance[i];
+  if(x+1<width){d=Math.min(d,knownMask[i+1]?1:distance[i+1]+1)}
+  if(y+1<height){d=Math.min(d,knownMask[i+width]?1:distance[i+width]+1)}
+  distance[i]=Math.min(maxFeather,d);
+ }
+ for(let i=0;i<n;i++){
+  if(knownMask[i])continue;
+  const k=i*4;
+  rgba[k]=chw[i];rgba[k+1]=chw[n+i];rgba[k+2]=chw[n*2+i];
+  rgba[k+3]=Math.round(255*Math.min(1,(distance[i]-.25)/(maxFeather-.25)));
  }
  return rgba;
 }

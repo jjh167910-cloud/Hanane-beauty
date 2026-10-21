@@ -30,7 +30,7 @@ function fixture(){
    stored.set(k,cache);return cache;
   }
  };
- const scope={URL,Response,caches,fetch:network,self:{location:{origin},clients:{async claim(){}},async skipWaiting(){},addEventListener:(name,fn)=>handlers[name]=fn}};
+ const scope={URL,Response,caches,fetch:network,self:{location:{origin:new URL(origin).origin},clients:{async claim(){}},async skipWaiting(){},addEventListener:(name,fn)=>handlers[name]=fn}};
  vm.runInNewContext(fs.readFileSync(new URL('../public/sw.js',import.meta.url),'utf8'),scope);
  return {
   requests:()=>networkRequests.slice(),

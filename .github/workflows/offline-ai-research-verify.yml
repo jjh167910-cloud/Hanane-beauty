@@ -24,6 +24,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Verify genuine browser-only hair segmentation
         run: node scripts/real-browser-inference-smoke.mjs
+      - name: Run real source/reference hair difference-mask topology offline experiment
+        run: node scripts/real-offhair-difference-mask-smoke.mjs
       - name: Build research-only MI-GAN (pinned checksum)
         run: npm run build:migan
       - name: Verify browser-only neural inpainting and airplane-mode rerun

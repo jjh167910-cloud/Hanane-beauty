@@ -92,7 +92,7 @@ Run `npm test` on the branch to execute the catalog/offline/image/face and resid
 
 The quality branch optionally uses **MI-GAN**, a small inpainting GAN designed for mobile devices, to reconstruct old hair visible beyond a selected style. This is a real neural background-restoration model, not a painted uniform-color patch. **It does not generate the new hairstyle**: hairstyles still come from the original 512px catalog references.
 
-- Model: `andraniksargsyan/migan`, `migan_pipeline_v2.onnx`, pinned Hugging Face revision `1538c135034b8c535f198d2a3569eaefc0309d5a`, fixed SHA-256 `6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b`.
+- Model: `andraniksargsyan/migan`, `migan_pipeline_v2.onnx`, pinned Hugging Face revision `1538c135034b8cfe7a8472f34d09c8a5a45b17a7`, fixed SHA-256 `6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b`.
 - Licensing: MIT code and weights; upstream `Picsart-AI-Research/MI-GAN/LICENSE-WEIGHTS` and mirrored `public/ai/inpaint/LICENSE-WEIGHTS.txt`. ONNX Runtime Web is MIT; include its notices when commercially distributing.
 - Build: `npm test` calls `npm run build`, which assembles local MediaPipe assets, downloads/validates the 28,079,181-byte MI-GAN model, and splits it into three 12-MiB-or-smaller parts for Cloudflare's 25-MiB per-asset limit. The pinned `onnxruntime-web@1.23.2` WASM runtime is copied locally, without CDN references.
 - Offline installation: main salon PWA installs without the neural weight. The user explicitly taps **ذخیره موتور عصبی برای آفلاین** while online; the service worker downloads six optional local files into the version-independent `hananeh-hq-inpaint-model-v1` cache. Use offline after that. No photo files are uploaded.

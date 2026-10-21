@@ -69,8 +69,10 @@ try{
    const x=observations[a],y=observations[b];
    if(!x?.mask||!y?.mask||!x.face||!y.face)
     return {pair:a+'-'+b,accepted:false,reason:'missing real source/ref hair or face'};
-   const dm=differenceMaskStudy({sourceRGBA:x.mask,referenceRGBA:y.mask,
-    width:dim,height:dim,sourceFace:x.face,referenceFace:y.face});
+   const props={sourceRGBA:x.mask,referenceRGBA:y.mask,
+    width:dim,height:dim,sourceFace:x.face,referenceFace:y.face};
+   const dm=differenceMaskStudy({...props,alignment:'eye-scale'});
+   const rolled=differenceMaskStudy({...props,alignment:'eye-similarity'});
    if(!presented&&dm.labels){
     const canvas=document.createElement('canvas');canvas.width=canvas.height=dim;
     canvas.style.cssText='max-width:512px;width:100%;display:block;margin:12px auto;border:1px solid #ddd';
@@ -82,6 +84,9 @@ try{
    }
    return {pair:a+'-'+b,accepted:dm.ok,reason:dm.reason,scaleRatio:dm.scaleRatio,
     counts:dm.counts,measures:dm.measures,
+    rollAblation:{accepted:rolled.ok,reason:rolled.reason,
+     rollDifferenceRadians:rolled.rollDifferenceRadians,
+     counts:rolled.counts,measures:rolled.measures},
     referenceHairstyleGenerated:dm.referenceHairstyleGenerated};
   });
   return {observed:ids.map(id=>({id,hasRealMask:!!observations[id]?.mask,
@@ -118,6 +123,8 @@ try{
  console.log('REAL OFFHAIR DIFFERENCE-MASK TOPOLOGY AND OFFLINE RELOAD PASSED '+JSON.stringify({
   analyzed: first.observed.length,measurable:first.evaluations.filter(x=>x.counts).length,
   accepted:first.evaluations.filter(x=>x.accepted).length,rejected:first.evaluations.filter(x=>!x.accepted).length,
+  rollAccepted:first.evaluations.filter(x=>x.rollAblation?.accepted).length,
   results:first.evaluations.map(x=>({pair:x.pair,accepted:x.accepted,reason:x.reason,
-  measures:x.measures}))}));
+  measures:x.measures,rollAccepted:x.rollAblation?.accepted,
+  rollReason:x.rollAblation?.reason,rollMeasures:x.rollAblation?.measures}))}));
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

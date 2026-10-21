@@ -213,7 +213,7 @@ test('Neural readiness never enables inference with uncertain segmentation',()=>
 
 test('Large customer-versus-reference pose differences disable neural restoration',()=>{
  const a=app();
- a.run("neuralInstalled=true;neuralBusy=false;hasResult=true;userImage={};userMask={mask:{},estimated:false};referenceMask={mask:{},estimated:false};faceUser={yaw:.58,eyeX:.4,eyeY:.35,eyeDistance:.22};faceRef={yaw:.03,eyeX:.5,eyeY:.35,eyeDistance:.22};qualityCore={poseCompatibility:(u,r)=>({mismatch:Math.abs(u.yaw-r.y)>=.34})};updateNeuralButtons()");
+ a.run("neuralInstalled=true;neuralBusy=false;hasResult=true;userImage={};userMask={mask:{},estimated:false};referenceMask={mask:{},estimated:false};faceUser={yaw:.58,eyeX:.4,eyeY:.35,eyeDistance:.22};faceRef={yaw:.03,eyeX:.5,eyeY:.35,eyeDistance:.22};qualityCore={poseCompatibility:(u,r)=>({mismatch:Math.abs(u.yaw-r.yaw)>=.34})};updateNeuralButtons()");
  assert.equal(a.elements.get('neuralRun').disabled,true);
  assert.match(a.run("updateQualityNotice({reliable:false});$('qualityNotice').textContent"),/زاویه/);
 });

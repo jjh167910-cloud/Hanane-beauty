@@ -48,3 +48,17 @@ test('Eye-distance anchors improve automatic registration with valid face detect
   assert.equal(faceAnchor([{keypoints:[{x:.5,y:.5},{x:.51,y:.5}]}]),null);
   assert.equal(faceAnchor([]),null);
 });
+
+test('BlazeFace nose tip adds a normalized side-pose cue',()=>{
+ const front=faceAnchor([{categories:[{score:.98}],keypoints:[
+  {x:.39,y:.34},{x:.61,y:.34},{x:.50,y:.47}
+ ]}]);
+ assert.ok(front);
+ assert.ok(Math.abs(front.yaw)<.001);
+ const angled=faceAnchor([{keypoints:[
+  {x:.39,y:.34},{x:.61,y:.34},{x:.62,y:.47}
+ ]}]);
+ assert.ok(angled?.yaw>.5);
+ const partial=faceAnchor([{keypoints:[{x:.39,y:.34},{x:.61,y:.34}]}]);
+ assert.equal(partial.yaw,null);
+});

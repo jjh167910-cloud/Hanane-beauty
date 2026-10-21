@@ -38,7 +38,7 @@ try{
   return route.continue();
  });
  await page.goto(origin+'/index.html',{waitUntil:'load'});
- const result=await page.evaluate(async()=>{
+ const inference=async()=>{
   const start=performance.now();
   const {FilesetResolver,ImageSegmenter}=await import('/ai/vendor/vision_bundle.mjs');
   const fileset=await FilesetResolver.forVisionTasks('/ai/wasm');
@@ -64,7 +64,8 @@ try{
      pixelCount:a.length,range:[min,max],durationMs:Math.round(performance.now()-start),
      crossOriginIsolated:self.crossOriginIsolated,wasmAvailable:!!self.WebAssembly};
   }finally{prediction.close();segmenter.close();}
- });
+ };
+ const result=await page.evaluate(inference);
  assert.ok(result.realLocalInference);
  assert.equal(result.finiteCount,result.pixelCount);
  assert.ok(result.pixelCount>10000);
@@ -72,6 +73,32 @@ try{
  assert.deepEqual(errors,[]);
  assert.deepEqual(external,[]);
  console.log('REAL LOCAL MEDIAPIPE BROWSER INFERENCE PASSED '+JSON.stringify(result));
+ // Simulate airplane mode only after a fully installed/activated service worker.
+ const registration=await page.evaluate(async()=>{
+   const r=await navigator.serviceWorker.register('/sw.js');
+   await navigator.serviceWorker.ready;
+   return {scope:r.scope};
+ });
+ await page.waitForFunction(()=>!!navigator.serviceWorker.controller,{timeout:30000});
+ const cacheAudit=await page.evaluate(async()=>{
+  const keys=await caches.keys(),cache=await caches.open(keys.find(k=>k.startsWith('hananeh-static-')));
+  const paths=['./index.html','./ai/hair-segmenter.mjs','./ai/vendor/vision_bundle.mjs',
+    './ai/models/hair_segmenter.tflite','./ai/wasm/vision_wasm_internal.wasm'];
+  return {keys,stored:await Promise.all(paths.map(async p=>!!(await cache.match(p))))};
+ });
+ assert.ok(cacheAudit.stored.every(Boolean),'Core/model/runtime files missing from offline cache');
+ await page.context().setOffline(true);
+ await page.goto(origin+'/index.html',{waitUntil:'load',timeout:20000});
+ const offline=await page.evaluate(inference);
+ assert.equal(offline.realLocalInference,true);
+ assert.equal(offline.crossOriginIsolated,true);
+ assert.equal(offline.finiteCount,offline.pixelCount);
+ assert.deepEqual(external,[]);
+ assert.deepEqual(errors,[]);
+ console.log('AIRPLANE MODE OFFLINE RELOAD AND REAL MODEL INFERENCE PASSED '+JSON.stringify({
+   offlineInference:offline.realLocalInference,dimensions:offline.dimensions,
+   durationMs:offline.durationMs,precacheConfirmed:cacheAudit.stored,registrationScope:registration.scope
+ }));
  if(warnings.length)console.log('Browser warnings (not assertion failures):',warnings.slice(0,3));
 }finally{
  await browser?.close();

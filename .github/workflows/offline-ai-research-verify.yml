@@ -30,6 +30,19 @@ jobs:
         run: node scripts/real-migan-browser-smoke.mjs
       - name: Verify integrated face-protected hair removal in-browser, including offline rerun
         run: node scripts/real-hair-removal-studio-smoke.mjs
+      - name: Validate measured research evidence against the frozen protocol
+        run: |
+          npm run research:validate
+          npm run research:summary
+      - name: Archive anonymous metadata-only research results
+        uses: actions/upload-artifact@v4
+        with:
+          name: offhair-research-evidence
+          path: |
+            research/paper/protocol-v1.json
+            research/results/offhair-ci-smoke-evidence.json
+          retention-days: 30
+          if-no-files-found: error
       - name: Package complete offline website
         uses: actions/upload-artifact@v4
         with:

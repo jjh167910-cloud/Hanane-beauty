@@ -38,7 +38,7 @@ function worker({redirectIndex=false}={}){
       };stores.set(name,cache);return cache;
     },
   };
-  const scope={URL,Response,caches,fetch:network,self:{location:{origin:'https://offline.test'},clients:{async claim(){}},async skipWaiting(){},addEventListener(name,handler){handlers[name]=handler}}};
+  const scope={URL,Response,Headers,caches,fetch:network,self:{location:{origin:'https://offline.test'},clients:{async claim(){}},async skipWaiting(){},addEventListener(name,handler){handlers[name]=handler}}};
   const ready=fs.readFile(new URL('../public/sw.js',import.meta.url),'utf8').then(source=>vm.runInNewContext(source,scope));
   return {caches,setOffline:()=>{online=false},async dispatch(name,event={}){await ready;let task;handlers[name]({...event,waitUntil:p=>task=p,respondWith:p=>task=p});return task}};
 }

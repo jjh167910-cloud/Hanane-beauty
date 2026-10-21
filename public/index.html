@@ -230,6 +230,119 @@ function updateQualityNotice(report){
   note.textContent=repairStats?.corrected>0?'ترمیم محدود بخش‌هایی از مو روی پس‌زمینه ساده انجام شد. نتیجه همچنان شبیه‌سازی است و ممکن است با واقعیت تفاوت داشته باشد.':'برای طبیعی‌تر شدن، چهره شما حفظ می‌شود. این پیش‌نمایش هنوز جایگزینی مولد مو نیست و ممکن است خط رویش واقعی نباشد.';
  }
 }
+/**
+ * Neural background repair uses a 512px local crop centred on the hair.
+ * This never sends photos or generated pixels to a server. The selected
+ * hairstyle is composited afterwards from the original reference bank.
+ */
+function neuralTicket(){
+ return [inputRevision,selected?.id,selectedVariant,
+  ...['scaleRange','xRange','yRange','rotRange'].map(numeric)].join(':');
+}
+function createNeuralStage(core){
+ if(!qualityCore||!faceUser||!userImage||!userMask?.mask||!referenceMask?.mask||
+    userMask.estimated||referenceMask.estimated)return null;
+ const W=PREVIEW_W,H=PREVIEW_H,S=512;
+ const hair=maskBox(userMask.mask);
+ const center=(hair.y+hair.h*.5)*H;
+ const cropY=Math.max(0,Math.min(H-W,Math.round(center-W*.5)));
+ const source=document.createElement('canvas');source.width=W;source.height=H;
+ const sc=source.getContext('2d',{willReadFrequently:true});
+ sc.drawImage(userMask.mask,0,0,W,H);
+ const target=document.createElement('canvas');target.width=W;target.height=H;
+ const tc=target.getContext('2d',{willReadFrequently:true});
+ tc.translate(fitted.x+numeric('xRange'),fitted.y+numeric('yRange'));
+ tc.rotate((fitted.rotation||0)+numeric('rotRange')*Math.PI/180);
+ const scale=fitted.s*numeric('scaleRange')/100;
+ tc.scale(scale,scale);
+ tc.drawImage(referenceMask.mask,-fitted.refEyeX,-fitted.refEyeY,512,512);
+ const guard=qualityCore.faceProtectionAlpha(W,H,faceUser);
+ const gc=document.createElement('canvas');gc.width=W;gc.height=H;
+ const gx=gc.getContext('2d',{willReadFrequently:true});
+ const gd=gx.createImageData(W,H);
+ for(let i=0;i<guard.length;i++){
+  gd.data[i*4]=guard[i];gd.data[i*4+1]=guard[i];
+  gd.data[i*4+2]=guard[i];gd.data[i*4+3]=255;
+ }
+ gx.putImageData(gd,0,0);
+ function sample(image){
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=S;
+  const context=canvas.getContext('2d',{willReadFrequently:true});
+  context.drawImage(image,0,cropY,W,W,0,0,S,S);
+  return context.getImageData(0,0,S,S).data;
+ }
+ const old=sample(source),next=sample(target),protectedPixels=sample(gc);
+ const facePixels=new Uint8Array(S*S);
+ for(let i=0;i<facePixels.length;i++)facePixels[i]=protectedPixels[i*4];
+ const eligibility=core.buildNeuralEraseMask(old,next,facePixels,S,S);
+ if(!eligibility.eligible)return {eligible:false,reason:eligibility.reason,coverage:eligibility.coverage};
+ const portrait=sample(userImage);
+ return {eligible:true,cropY,mask:eligibility.mask,
+  pixels:core.imageDataToCHW(portrait,S,S)};
+}
+function getNeuralWorker(){
+ if(neuralWorker)return neuralWorker;
+ if(typeof Worker!=='function')throw Error('این مرورگر اجرای موتور عصبی را پشتیبانی نمی‌کند');
+ const worker=new Worker('./ai/neural-inpaint-worker.mjs',{type:'module'});
+ worker.addEventListener('message',event=>{
+  const d=event.data||{},pending=neuralPending.get(d.id);
+  if(!pending)return;
+  neuralPending.delete(d.id);clearTimeout(pending.timeout);
+  if(d.type==='RESULT')pending.resolve(new Uint8Array(d.image));
+  else pending.reject(Error(d.error||'Local neural inference failed'));
+ });
+ worker.addEventListener('error',event=>{
+  for(const t of neuralPending.values()){
+   clearTimeout(t.timeout);t.reject(Error('On-device AI worker failed'));
+  }
+  neuralPending.clear();worker.terminate();neuralWorker=null;
+ });
+ neuralWorker=worker;return worker;
+}
+function requestNeuralInference(pixels,mask){
+ const worker=getNeuralWorker(),id=++neuralRequest;
+ return new Promise((resolve,reject)=>{
+  const timeout=setTimeout(()=>{
+   if(!neuralPending.has(id))return;
+   neuralPending.delete(id);worker.terminate();neuralWorker=null;
+   reject(Error('On-device inference exceeded the mobile time limit'));
+  },180000);
+  neuralPending.set(id,{resolve,reject,timeout});
+  const imageCopy=pixels.slice(),maskCopy=mask.slice();
+  try{worker.postMessage({type:'RUN',id,width:512,height:512,
+       image:imageCopy.buffer,mask:maskCopy.buffer},
+      [imageCopy.buffer,maskCopy.buffer]);}
+  catch(error){neuralPending.delete(id);clearTimeout(timeout);reject(error);}
+ });
+}
+async function runNeuralHairRepair(){
+ if(neuralBusy||!neuralInstalled||!hasResult||!userImage)return;
+ neuralBusy=true;updateNeuralButtons();
+ const ticket=neuralTicket();
+ try{
+  if(!qualityCore||!faceUser||userMask?.estimated||referenceMask?.estimated)
+   throw Error('برای بازسازی عصبی، ابتدا عکس چهره و مو با AI شناسایی شوند');
+  const core=await import('./ai/neural-inpaint-core.mjs');
+  if(ticket!==neuralTicket())return;
+  const stage=createNeuralStage(core);
+  if(!stage?.eligible)throw Error('محدوده امن و کافی برای ترمیم عصبی تشخیص داده نشد: '+(stage?.reason||'no face'));
+  neuralMessage('در حال بازسازی پس‌زمینه با مدل عصبی روی گوشی؛ لطفاً برنامه را باز نگه دارید…');
+  const result=await requestNeuralInference(stage.pixels,stage.mask);
+  if(ticket!==neuralTicket())return;
+  const rgba=core.neuralOutputToRGBA(result,stage.mask,512,512);
+  const patch=document.createElement('canvas');patch.width=patch.height=512;
+  const pc=patch.getContext('2d');
+  const data=pc.createImageData(512,512);data.data.set(rgba);pc.putImageData(data,0,0);
+  const layer=document.createElement('canvas');layer.width=PREVIEW_W;layer.height=PREVIEW_H;
+  layer.getContext('2d').drawImage(patch,0,stage.cropY,PREVIEW_W,PREVIEW_W);
+  neuralLayer=layer;repairLayer=null;
+  drawResult();
+  $('qualityNotice').textContent='بازسازی عصبی پس‌زمینه انجام شد. این خروجی همچنان مشاوره‌ای است؛ شکل و نور موهای جدید از تصویر مرجع گرفته می‌شود.';
+  neuralMessage('✓ ترمیم عصبی کامل شد. عکس با مدل مو همچنان روی همین دستگاه است.');
+ }catch(e){
+  neuralMessage('ترمیم عصبی برای این عکس مناسب نبود: '+String(e?.message||e));
+ }finally{neuralBusy=false;updateNeuralButtons();}
+}
 function drawResult(){
  drawUser();
  if(showBefore||!referenceLayer||!userImage)return;

@@ -5,6 +5,7 @@
  */
 const MODEL_DIGEST='6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b';
 const PARTS=['model-part-00.bin','model-part-01.bin','model-part-02.bin'];
+const PART_SIZES=[12582912,12582912,2913357]; // 28,079,181 bytes total
 let sessionPromise=null,running=false;
 async function initialize(){
  const runtime=await import('./inpaint/runtime/ort.wasm.min.mjs');
@@ -13,22 +14,24 @@ async function initialize(){
  ort.env.wasm.wasmPaths=new URL('./inpaint/runtime/',import.meta.url).href;
  ort.env.wasm.numThreads=1;
  ort.env.wasm.proxy=false;
- const parts=[];
- let size=0;
- for(const name of PARTS){
-  const response=await fetch(new URL('./inpaint/'+name,import.meta.url),{cache:'force-cache'});
-  if(!response.ok||response.redirected)throw Error('AI file not cached: '+name);
-  const binary=new Uint8Array(await response.arrayBuffer());
-  // Reject truncated or unexpectedly large cache entries before allocating a
-  // second copy of the ONNX model on memory-constrained Android devices.
-  if(binary.length<1024||binary.length>12*1024*1024)
-   throw Error('Invalid neural model shard: '+name);
-  parts.push(binary);size+=binary.length;
- }
- if(size!==28079181)throw Error('Incorrect offline neural model size: '+size);
+ // Allocate the completed ONNX file just once. Avoid holding all three
+ // shard buffers plus a second concatenated buffer on RAM-limited phones.
+ const size=PART_SIZES.reduce((sum,n)=>sum+n,0);
+ if(size!==28079181)throw Error('Incorrect pinned neural model size');
  const binary=new Uint8Array(size);
  let offset=0;
- for(const part of parts){binary.set(part,offset);offset+=part.length;}
+ for(let i=0;i<PARTS.length;i++){
+  const name=PARTS[i];
+  const response=await fetch(new URL('./inpaint/'+name,import.meta.url),{cache:'force-cache'});
+  if(!response.ok||response.redirected||
+     (response.headers.get('content-type')||'').toLowerCase().includes('text/html'))
+    throw Error('AI file unavailable offline: '+name);
+  const part=new Uint8Array(await response.arrayBuffer());
+  if(part.byteLength!==PART_SIZES[i])
+    throw Error('Neural model shard size mismatch: '+name);
+  binary.set(part,offset);
+  offset+=part.byteLength;
+ }
  if(!crypto?.subtle)throw Error('Secure checksum verification unavailable');
  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',binary)))
   .map(v=>v.toString(16).padStart(2,'0')).join('');

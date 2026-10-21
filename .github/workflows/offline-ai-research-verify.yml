@@ -1,0 +1,27 @@
+name: Offline AI research verification
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/offline-generative-feasibility-2026-10-21
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: npm run test:unit
+      - name: Verify complete offline model assets
+        run: |
+          test -s public/ai/models/hair_segmenter.tflite
+          test -s public/ai/models/blaze_face_short_range.tflite
+          test -s public/ai/wasm/vision_wasm_internal.wasm
+          test -s public/ai/wasm/vision_wasm_nosimd_internal.wasm
+          test -s public/_headers

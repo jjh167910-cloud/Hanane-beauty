@@ -100,3 +100,13 @@ The quality branch optionally uses **MI-GAN**, a small inpainting GAN designed f
 - Known limits: very large old hair, missing scalp/back-of-head and highly detailed lighting/strands may still look artificial; operating on a 512-pixel crop cannot reconstruct unlimited detail. Memory and runtime on Android phones remain **unverified**, and the inference path has **not been proven in a real phone browser**.
 
 **Do not merge the draft PR into `main` or advertise real-world photorealism** before the neural model has successfully loaded and inferred on target Android hardware and blinded visual A/B testing beats the existing app. Cloudflare static assets are only a delivery mechanism, not GPU inference. Do not create a remote photo-processing fallback without user opt-in.
+
+### Pose-compatibility and mobile cancellation (quality safety pass)
+
+The optional local face detector supplies **nose and eye keypoints**, permitting a rough left/right head-angle compatibility test (`poseCompatibility`). When the customer's pose differs substantially from the hairstyle reference, the app displays a Persian warning and disables experimental neural restoration for that pair. This is a conservative 2D proxy—not a full 3D face-pose solver.
+
+The expensive ONNX Worker is terminated, pending model tasks are rejected, and sensitive pixel buffers become eligible for release when a different portrait/style is selected, a hairstyle is moved mid-inference, or the browser page is hidden. Native browser memory recovery timing depends on the device.
+
+A second inpainting gate rejects masks that touch the top, sides or internal lower boundary of its 512px inference crop, preventing artificial horizontal lines where the reconstruction would abruptly stop. That means long hair extending beyond the safe crop may be **intentionally refused**, not erased.
+
+Verification in this pass: 28/28 targeted try-on interaction checks; 6/6 isolated MediaPipe mask/face regression checks; additional synthetic tests for pose and cropped reconstruction. This is **not** an Android inference/photorealism certification; the full project build and real-model image tests remain pending.

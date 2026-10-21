@@ -61,6 +61,7 @@ test('Cloudflare 25 MiB limit is respected by splitting the pinned model into sh
  assert.match(source,/if\(parts\.length!==3\)/);
  assert.match(source,/6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b/);
  assert.match(source,/digest!==expectedSha/);
+ assert.match(source,/1538c135034b8cfe7a8472f34d09c8a5a45b17a7/);
 });
 test('PWA keeps large advanced model optional while caching control modules offline',()=>{
  const sw=fs.readFileSync(new URL('../public/sw.js',import.meta.url),'utf8');

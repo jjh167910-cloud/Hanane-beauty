@@ -43,6 +43,9 @@ try{
  const measure=async()=>{
   const {getLocalHairSegmenter}=await import('/ai/hair-segmenter.mjs');
   const {differenceMaskStudy,mapTopologyToRGBA}=await import('/ai/offhair-difference-masks.mjs');
+  const {observationFromFaceAnchor,transferSupportMask,gateTargetSupport}=await import('/ai/offhair-pose-flow.mjs');
+  const {makeLandmarkFaceZones}=await import('/ai/offhair-face-zones.mjs');
+  const learnedWeights=await (await fetch('/ai/models/offhair-synthetic-pose-flow-v1.json')).json();
   const engine=await getLocalHairSegmenter(),dim=512;
   const ids=['1','2','3','6','9'],observations={};
   for(const id of ids){
@@ -74,6 +77,51 @@ try{
    const dm=differenceMaskStudy({...props,alignment:'eye-scale'});
    const rolled=differenceMaskStudy({...props,alignment:'eye-similarity'});
    const anatomical=differenceMaskStudy({...props,alignment:'eye-similarity',faceProtection:'landmark-core'});
+   // Compatibility stress: genuine detector observations, synthetic-only fitted weights.
+   // DO NOT compare against a real target hairstyle ground truth (none exists).
+   const left=observationFromFaceAnchor(x.face,128,128);
+   const right=observationFromFaceAnchor(y.face,128,128);
+   let student={eligibleForAutomaticEditing:false,
+     simulationTrained:true,realPhotoGeometryValidated:false};
+   if(!left.ok||!right.ok){
+    student={...student,acceptedForDescriptiveAnalysis:false,
+     reason:'landmarks_outside_synthetic_training_support',
+     sourceReason:left.reason||null,referenceReason:right.reason||null};
+   }else{
+    const binary=new Uint8Array(128*128);
+    for(let yy=0;yy<128;yy++)for(let xx=0;xx<128;xx++){
+     // Sample the independent REAL reference mask at 512 resolution.
+     const sx=xx*4+2,sy=yy*4+2;
+     binary[yy*128+xx]=y.mask[(sy*512+sx)*4]>=178?255:0;
+    }
+    const learned=transferSupportMask(binary,128,128,
+      {...left.frame,noseBias:left.noseBias,earBias:left.earBias},
+      {...right.frame,noseBias:right.noseBias,earBias:right.earBias},
+      {model:learnedWeights,mode:'learned'});
+    const roll=transferSupportMask(binary,128,128,
+      left.frame,right.frame,{mode:'similarity'});
+    const zones=makeLandmarkFaceZones(x.face,128,128);
+    if(!zones.ok)student={...student,acceptedForDescriptiveAnalysis:false,reason:zones.reason};
+    else{
+     const core=new Uint8Array(128*128),forehead=new Uint8Array(128*128);
+     for(let i=0;i<core.length;i++){
+      core[i]=zones.zones[i]===1?1:0;
+      forehead[i]=zones.zones[i]===2?1:0;
+     }
+     const gate=gateTargetSupport(learned,core,forehead);
+     let changed=0;
+     for(let i=0;i<learned.length;i++)if((learned[i]>0)!==(roll[i]>0))changed++;
+     student={...student,acceptedForDescriptiveAnalysis:true,
+       sourceNoseBias:left.noseBias,referenceNoseBias:right.noseBias,
+       sourceEarBias:left.earBias,referenceEarBias:right.earBias,
+       proposedHairPixels:gate.hairPixels,
+       disagreementWithSimilarityPixels:changed,
+       immutableCoreConflicts:gate.protectedConflicts,
+       unresolvedForeheadPixels:gate.foreheadUnresolved,
+       eligibleForAutomaticEditing:gate.automaticEditingAllowed,
+       reason:gate.reason};
+    }
+   }
    if(!presented&&a==='2'&&b==='6'&&dm.labels&&anatomical.labels){
     const section=document.createElement('section');
     section.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px;max-width:1050px;margin:auto';
@@ -96,6 +144,7 @@ try{
     rollAblation:{accepted:rolled.ok,reason:rolled.reason,
      rollDifferenceRadians:rolled.rollDifferenceRadians,
      counts:rolled.counts,measures:rolled.measures},
+    learnedSyntheticStudent:student,
     landmarkAblation:{accepted:anatomical.ok,reason:anatomical.reason,
      hasValidatedFaceAnatomy:!String(anatomical.reason).includes('geometry'),
      eligibleForAutomatedEditing:anatomical.eligibleForAutomatedEditing===true,
@@ -116,6 +165,7 @@ try{
  for(const entry of first.evaluations)if(entry.counts){
   const c=entry.counts;assert.equal(
    c.remove+c.add+c.overlap+c.preserve+c.faceConflict,512*512);
+  assert.equal(entry.learnedSyntheticStudent?.eligibleForAutomaticEditing,false);
   const d=entry.landmarkAblation?.counts;
   if(d)assert.equal(d.remove+d.add+d.overlap+d.preserve+
     d.faceConflict+d.foreheadPending,512*512,'Anatomical topology must exhaust pixels');
@@ -146,6 +196,8 @@ try{
   anatomyReady:first.evaluations.filter(x=>x.landmarkAblation?.hasValidatedFaceAnatomy).length,
   anatomyManualReview:first.evaluations.filter(x=>x.landmarkAblation?.manualReviewRequired).length,
   anatomyHighCoreConflictReview:first.evaluations.filter(x=>x.landmarkAblation?.coreConflictReviewRisk==='high_exploratory').length,
+  syntheticStudentObservationAvailable:first.evaluations.filter(x=>x.learnedSyntheticStudent?.acceptedForDescriptiveAnalysis).length,
+  syntheticStudentAutomaticApprovals:first.evaluations.filter(x=>x.learnedSyntheticStudent?.eligibleForAutomaticEditing).length,
   results:first.evaluations.map(x=>({pair:x.pair,accepted:x.accepted,reason:x.reason,
   measures:x.measures,rollAccepted:x.rollAblation?.accepted,
   rollReason:x.rollAblation?.reason,rollMeasures:x.rollAblation?.measures,
@@ -153,5 +205,6 @@ try{
   landmarkReason:x.landmarkAblation?.reason,
   reviewOnly:x.landmarkAblation?.manualReviewRequired,
   coreConflictReviewRisk:x.landmarkAblation?.coreConflictReviewRisk,
-  landmarkMeasures:x.landmarkAblation?.measures}))}));
+  landmarkMeasures:x.landmarkAblation?.measures,
+  syntheticStudent:x.learnedSyntheticStudent}))}));
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

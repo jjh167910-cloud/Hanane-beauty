@@ -6,14 +6,23 @@ function validFace(f){
  return f&&[f.eyeX,f.eyeY,f.eyeDistance].every(Number.isFinite)&&
  f.eyeX>.13&&f.eyeX<.87&&f.eyeY>.16&&f.eyeY<.75&&f.eyeDistance>=.055&&f.eyeDistance<=.38;
 }
-export function differenceMaskStudy({sourceRGBA,referenceRGBA,width,height,sourceFace,referenceFace,threshold=178,maxScale=1.8}){
+export function differenceMaskStudy({sourceRGBA,referenceRGBA,width,height,sourceFace,referenceFace,threshold=178,maxScale=1.8,alignment='eye-scale'}){
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<32||height<32||
   width*height>1024*1024||sourceRGBA?.length!==width*height*4||
   referenceRGBA?.length!==width*height*4)throw new TypeError('Both masks must have identical RGBA dimensions');
  if(!Number.isInteger(threshold)||threshold<128||threshold>245||
- !Number.isFinite(maxScale)||maxScale<1||maxScale>3)throw new TypeError('Invalid topology options');
+ !Number.isFinite(maxScale)||maxScale<1||maxScale>3||
+ !['eye-scale','eye-similarity'].includes(alignment))throw new TypeError('Invalid topology options');
  if(!validFace(sourceFace)||!validFace(referenceFace))return fail('Unreliable face landmarks');
- const ratio=sourceFace.eyeDistance/referenceFace.eyeDistance;
+ const hasRoll=[sourceFace.eyeRollRadians,referenceFace.eyeRollRadians,
+  sourceFace.eyeSpan,referenceFace.eyeSpan].every(Number.isFinite);
+ if(alignment==='eye-similarity'&&!hasRoll)return fail('Two-eye rotation coordinates unavailable');
+ const ratio=alignment==='eye-similarity'?
+  sourceFace.eyeSpan/referenceFace.eyeSpan:
+  sourceFace.eyeDistance/referenceFace.eyeDistance;
+ const delta=alignment==='eye-similarity'?
+  referenceFace.eyeRollRadians-sourceFace.eyeRollRadians:0;
+ const cos=Math.cos(delta),sin=Math.sin(delta);
  if(ratio<1/maxScale||ratio>maxScale)return fail('Face-scale mismatch exceeds study bounds');
  const n=width*height,labels=new Uint8Array(n);
  // Labels: 0 preserve background; 1 remove source only; 2 add reference only;
@@ -34,13 +43,18 @@ export function differenceMaskStudy({sourceRGBA,referenceRGBA,width,height,sourc
  for(let yy=0;yy<height;yy++)for(let xx=0;xx<width;xx++){
   if(referenceRGBA[(yy*width+xx)*4]<threshold)continue;
   refTotal++;
-  const tx=sx+(xx-rx)*ratio,ty=sy+(yy-ry)*ratio;
+  // Reference -> source inverse of the source -> reference similarity map.
+  const dx=xx-rx,dy=yy-ry;
+  const tx=sx+(cos*dx+sin*dy)*ratio;
+  const ty=sy+(-sin*dx+cos*dy)*ratio;
   if(tx<0||tx>=width||ty<0||ty>=height)refClipped++;
  }
  if(refTotal/n<.005||refTotal/n>.5)return fail('Reference segmentation outside plausible support');
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
   const i=y*width+x,source=sourceRGBA[i*4]>=threshold;
-  const tx=Math.round(rx+(x-sx)/ratio),ty=Math.round(ry+(y-sy)/ratio);
+  const dx=(x-sx)/ratio,dy=(y-sy)/ratio;
+  const tx=Math.round(rx+cos*dx-sin*dy);
+  const ty=Math.round(ry+sin*dx+cos*dy);
   const mapped=tx>=0&&tx<width&&ty>=0&&ty<height;
   const target=mapped&&referenceRGBA[(ty*width+tx)*4]>=threshold;
   if(!mapped)coveredOutOfBounds++;
@@ -66,7 +80,8 @@ export function differenceMaskStudy({sourceRGBA,referenceRGBA,width,height,sourc
  if(editable/n<.002)flags.push('insufficient_editable_region');
  const valid=flags.length===0;
  return {ok:valid,reason:valid?'2D pose proxy only; visual quality unverified':flags.join(', '),
-  proxyAlignment:true,referenceHairstyleGenerated:false,labels,
+  proxyAlignment:true,alignment,rollDifferenceRadians:delta,
+  referenceHairstyleGenerated:false,labels,
   width,height,scaleRatio:ratio,counts,
   measures:{sourceHairFraction:counts.sourceHair/n,targetProxyHairFraction:counts.targetHairProxy/n,
    editUnionFraction:editable/n,unmodifiedFraction:counts.preserve/n,
@@ -75,6 +90,7 @@ export function differenceMaskStudy({sourceRGBA,referenceRGBA,width,height,sourc
    relativeUnknownMappedFraction:coveredOutOfBounds/n},
   cautions:['Landmark scale/translation is not head-pose estimation.',
    'Label counts do not predict generative FLOPs, latency, naturalness or reference fidelity.',
+   'Two-eye roll correction does not model yaw, occlusion, perspective or 3D head shape.',
    'Face-protected regions are excluded from edit even if fringe/hair crosses forehead.']};
 }
 export function mapTopologyToRGBA(result){

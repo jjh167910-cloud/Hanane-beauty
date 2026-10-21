@@ -4,9 +4,9 @@
  * Every script pack contains pre-bundled images, so success means the complete
  * catalog can open without a network connection (until browser data is evicted).
  */
-const VERSION='hananeh-static-20261021-v10-hires';
+const VERSION='hananeh-static-20261021-v11-hairgate';
 const PACKS=Array.from({length:14},(_,i)=>'./data/pack-'+String(i+1).padStart(2,'0')+'.js');
-const CORE=['./','./index.html','./ai/high-res-engine.js','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png',...PACKS];
+const CORE=['./','./index.html','./ai/high-res-engine.js','./ai/hair-coverage.js','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png',...PACKS];
 // Optional AI assets: a missing model never prevents the offline catalog from installing.
 const AI_FILES=['./ai/hair-segmenter.mjs','./ai/mask-utils.mjs',
   './ai/vendor/vision_bundle.mjs','./ai/models/hair_segmenter.tflite',

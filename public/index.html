@@ -240,6 +240,21 @@ function updateQualityNotice(report){
  * This never sends photos or generated pixels to a server. The selected
  * hairstyle is composited afterwards from the original reference bank.
  */
+/**
+ * Immediately end in-flight local AI when the customer changes portraits or
+ * styles. A terminated WASM worker cannot keep its decoded 28 MB model alive.
+ */
+function cancelNeuralInference(){
+ if(neuralWorker){try{neuralWorker.terminate();}catch(_){ }neuralWorker=null;}
+ for(const job of neuralPending.values()){
+  clearTimeout(job.timeout);
+  job.reject(Error('Previous neural reconstruction cancelled'));
+ }
+ neuralPending.clear();
+ neuralBusy=false;
+ neuralLayer=null;
+ updateNeuralButtons();
+}
 function neuralTicket(){
  return [inputRevision,selected?.id,selectedVariant,
   ...['scaleRange','xRange','yRange','rotRange'].map(numeric)].join(':');
@@ -402,6 +417,7 @@ async function uploadFile(file){if(!file)return;
  // Invalidate the previous portrait immediately, including rejected files.
  // A failed replacement must never leave an old customer's photo or export on screen.
  const upload=++uploadRevision;++inputRevision;
+ if(neuralBusy||neuralWorker)cancelNeuralInference();
  loadingPhoto=false;userImage=null;selfie=null;userMask=null;faceUser=null;
  hasResult=false;referenceLayer=null;faceLayer=null;repairLayer=null;repairStats=null;neuralLayer=null;showBefore=false;previewQueued=false;updateNeuralButtons();$('qualityNotice').textContent='یک سلفی واضح و مدل مو انتخاب کنید.';
  $('saveBtn').disabled=true;$('toggleBefore').textContent='نمایش عکس اصلی';
@@ -500,9 +516,9 @@ function renderGrid(){const visible=filtered.slice(0,countVisible);$('count').te
 function openStyle(id){browsingStyle=catalog.find(f=>f.id===Number(id));if(!browsingStyle)return;browsingVariant=0;paintSheet();$('styleSheet').classList.add('open');$('styleSheet').setAttribute('aria-hidden','false');}
 function paintSheet(){$('sheetImage').src=imgPath(browsingStyle.variantIds[browsingVariant],'full');$('sheetTitle').textContent=browsingStyle.variantNames[browsingVariant]||browsingStyle.name;$('sheetCode').textContent=browsingStyle.code;$('sheetDescription').textContent=browsingStyle.description||'این مدل به‌عنوان یک استایل مستقل در بانک حنانه بیوتی ثبت شده است.';$('variants').innerHTML=browsingStyle.variantIds.map((id,i)=>`<button type="button" class="variant ${i===browsingVariant?'active':''}" data-variant="${i}"><img src="${imgPath(id)}" alt="${browsingStyle.variantNames[i]}">${browsingStyle.variantNames[i]}</button>`).join('');}
 function closeSheet(){$('styleSheet').classList.remove('open');$('styleSheet').setAttribute('aria-hidden','true');}
-function chooseStyle(){if(!browsingStyle)return;selected=browsingStyle;selectedVariant=browsingVariant;++inputRevision;refImage=null;referenceLayer=null;faceLayer=null;repairLayer=null;repairStats=null;neuralLayer=null;hasResult=false;updateNeuralButtons();$('qualityNotice').textContent='در حال آماده‌سازی پیش‌نمایش استایل جدید…';$('saveBtn').disabled=true;$('chosenThumb').src=imgPath(selected.variantIds[selectedVariant]);$('chosenThumb').style.display='block';$('chosenTitle').textContent=selected.variantNames[selectedVariant]||selected.name;$('chosenCode').textContent=selected.code;closeSheet();showBefore=false;resetControls();drawUser();updateBtn();setProgress(userImage?'در حال امتحان مدل روی عکس شما…':'مدل انتخاب شد. یک عکس واضح و روبه‌رو از خودتان انتخاب کنید.');document.getElementById('tryon').scrollIntoView({behavior:'smooth'});if(userImage)requestPreview();else if(!loadingPhoto)$('photoInput').click();}
+function chooseStyle(){if(!browsingStyle)return;selected=browsingStyle;selectedVariant=browsingVariant;++inputRevision;if(neuralBusy||neuralWorker)cancelNeuralInference();refImage=null;referenceLayer=null;faceLayer=null;repairLayer=null;repairStats=null;neuralLayer=null;hasResult=false;updateNeuralButtons();$('qualityNotice').textContent='در حال آماده‌سازی پیش‌نمایش استایل جدید…';$('saveBtn').disabled=true;$('chosenThumb').src=imgPath(selected.variantIds[selectedVariant]);$('chosenThumb').style.display='block';$('chosenTitle').textContent=selected.variantNames[selectedVariant]||selected.name;$('chosenCode').textContent=selected.code;closeSheet();showBefore=false;resetControls();drawUser();updateBtn();setProgress(userImage?'در حال امتحان مدل روی عکس شما…':'مدل انتخاب شد. یک عکس واضح و روبه‌رو از خودتان انتخاب کنید.');document.getElementById('tryon').scrollIntoView({behavior:'smooth'});if(userImage)requestPreview();else if(!loadingPhoto)$('photoInput').click();}
 function resetControls(){['scaleRange','xRange','yRange','rotRange'].forEach((id,i)=>$(id).value=i===0?100:0);if(hasResult){refreshVisualQuality();drawResult();}}
-function handleDrag(){let previous=null;resultCanvas.addEventListener('pointerdown',e=>{if(!hasResult)return;previous={x:e.clientX,y:e.clientY};resultCanvas.setPointerCapture(e.pointerId);});resultCanvas.addEventListener('pointermove',e=>{if(!previous)return;const rc=resultCanvas.getBoundingClientRect();const dx=(e.clientX-previous.x)*PREVIEW_W/rc.width;const dy=(e.clientY-previous.y)*PREVIEW_H/rc.height; $('xRange').value=Math.max(-180,Math.min(180,numeric('xRange')+dx));$('yRange').value=Math.max(-180,Math.min(180,numeric('yRange')+dy));previous={x:e.clientX,y:e.clientY};repairLayer=null;neuralLayer=null;drawResult();});for(const event of ['pointerup','pointercancel'])resultCanvas.addEventListener(event,()=>{
+function handleDrag(){let previous=null;resultCanvas.addEventListener('pointerdown',e=>{if(!hasResult)return;previous={x:e.clientX,y:e.clientY};resultCanvas.setPointerCapture(e.pointerId);});resultCanvas.addEventListener('pointermove',e=>{if(!previous)return;const rc=resultCanvas.getBoundingClientRect();const dx=(e.clientX-previous.x)*PREVIEW_W/rc.width;const dy=(e.clientY-previous.y)*PREVIEW_H/rc.height; $('xRange').value=Math.max(-180,Math.min(180,numeric('xRange')+dx));$('yRange').value=Math.max(-180,Math.min(180,numeric('yRange')+dy));previous={x:e.clientX,y:e.clientY};if(neuralBusy)cancelNeuralInference();repairLayer=null;neuralLayer=null;drawResult();});for(const event of ['pointerup','pointercancel'])resultCanvas.addEventListener(event,()=>{
  if(previous&&hasResult){refreshVisualQuality();drawResult();}previous=null;
  });}
 async function init(){try{const r={ok:true,json:async()=>window.OFFLINE_CATALOG};if(!r.ok)throw Error('catalog.json unavailable');catalog=await r.json();renderChips();filterStyles();}catch(e){setProgress('بارگذاری کاتالوگ با مشکل روبه‌رو شد. برنامه را از نسخه نصب‌شده اندروید اجرا کنید.');$('count').textContent='کاتالوگ در دسترس نیست';}}
@@ -515,12 +531,13 @@ $('neuralInstall').addEventListener('click',()=>{
  neuralBusy=true;updateNeuralButtons();neuralMessage('در حال دریافت بسته آفلاین...');postHQ('HQ_PREPARE');
 });
 $('neuralRun').addEventListener('click',()=>runNeuralHairRepair());
+window.addEventListener('pagehide',()=>{if(neuralBusy||neuralWorker)cancelNeuralInference();});
 $('resetBtn').addEventListener('click',resetControls);
 $('protectFace').addEventListener('change',()=>{if(hasResult)drawResult();});
 $('repairHair').addEventListener('change',()=>{if(hasResult){refreshVisualQuality();drawResult();}});
 $('saveBtn').addEventListener('click',save);
 for(const id of ['scaleRange','xRange','yRange','rotRange']){
- $(id).addEventListener('input',()=>{if(hasResult){repairLayer=null;neuralLayer=null;drawResult();}});
+ $(id).addEventListener('input',()=>{if(hasResult){if(neuralBusy)cancelNeuralInference();repairLayer=null;neuralLayer=null;drawResult();}});
  $(id).addEventListener('change',()=>{if(hasResult){refreshVisualQuality();drawResult();}});
 }
 $('search').addEventListener('input',e=>{search=normalizeFarsi(e.target.value);filterStyles();});

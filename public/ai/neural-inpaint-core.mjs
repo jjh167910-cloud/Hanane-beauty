@@ -25,7 +25,7 @@ export function buildNeuralEraseMask(original,projected,faceGuard,width,height){
  let edgeCount=0;
  for(let y=0;y<maxY;y++)for(let x=0;x<width;x++){
   const i=y*width+x;
-  if(wanted[i]&&(x<pad||x>=width-pad||y<pad||y>=height-pad))edgeCount++;
+  if(wanted[i]&&(x<pad||x>=width-pad||y<pad||y>=maxY-pad))edgeCount++;
  }
  if(edgeCount>Math.max(12,Math.floor(coverage*.025)))
    return {eligible:false,reason:'crop-boundary',coverage,mask:null};

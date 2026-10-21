@@ -12,8 +12,20 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dest=path.join(root,'public','ai','inpaint');
 const vendor=path.join(root,'node_modules','onnxruntime-web','dist');
 const files=['ort.wasm.min.mjs','ort-wasm-simd-threaded.wasm','ort-wasm-simd-threaded.mjs'];
+const maxStaticAsset=25*1024*1024;
+const runtimeFiles=[];
 await fs.mkdir(path.join(dest,'runtime'),{recursive:true});
-for(const file of files)await fs.copyFile(path.join(vendor,file),path.join(dest,'runtime',file));
+for(const file of files){
+ const payload=await fs.readFile(path.join(vendor,file));
+ if(payload.length<1024||payload.length>maxStaticAsset)
+  throw Error('Unsupported Cloudflare static asset size for '+file+': '+payload.length);
+ if(file.endsWith('.wasm')&&payload.toString('ascii',0,4)!=='\\0asm'.replace('\\0','\0'))
+  throw Error('Invalid WASM header: '+file);
+ const location=path.join(dest,'runtime',file);
+ await fs.writeFile(location,payload);
+ runtimeFiles.push({file:'runtime/'+file,bytes:payload.length,
+  sha256:createHash('sha256').update(payload).digest('hex')});
+}
 const model='migan_pipeline_v2.onnx';
 const remote='https://huggingface.co/andraniksargsyan/migan/resolve/1538c135034b8c535f198d2a3569eaefc0309d5a/'+model;
 const expectedSha='6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b';
@@ -46,7 +58,8 @@ for(let offset=0;offset<bytes.length;offset+=shardSize){
 if(parts.length!==3)throw Error('Expected exactly three Cloudflare-safe model parts');
 await fs.rm(original,{force:true});
 const meta={model:'MI-GAN ONNX pipeline v2',modelSha256:expectedSha,
-  modelBytes:bytes.length,parts,runtime:'onnxruntime-web',
+  modelBytes:bytes.length,parts,runtime:'onnxruntime-web@1.23.2',
+  runtimeFiles,totalDownloadBytes:bytes.length+runtimeFiles.reduce((n,f)=>n+f.bytes,0),
   license:'MIT Picsart AI Research',inference:'on-device-only',purpose:'background inpainting'};
 await fs.writeFile(path.join(dest,'bundle.json'),JSON.stringify(meta,null,2)+'\n');
 console.log('OFFLINE MI-GAN: packaged '+bytes.length+' bytes in '+parts.length+' shards; SHA256 '+digest);

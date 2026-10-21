@@ -341,10 +341,12 @@ function requestNeuralInference(pixels,mask){
 }
 async function testNeuralEngine(){
  if(!neuralInstalled||neuralBusy||neuralVerified)return;
- const worker=getNeuralWorker(),id=++neuralRequest;
  neuralBusy=true;updateNeuralButtons();
  neuralMessage('تست واقعی مدل روی پردازندهٔ گوشی، فقط با عکس ساختگی؛ بدون نیاز به عکس مشتری…');
  try{
+  // Worker initialization must be guarded too: unsupported phones can throw
+  // before any async message is sent.
+  const worker=getNeuralWorker(),id=++neuralRequest;
   const metrics=await new Promise((resolve,reject)=>{
    const timeout=setTimeout(()=>{
     neuralPending.delete(id);worker.terminate();neuralWorker=null;

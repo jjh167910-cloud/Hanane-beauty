@@ -19,6 +19,16 @@ export function buildNeuralEraseMask(original,projected,faceGuard,width,height){
  }
  if(coverage<100)return {eligible:false,reason:'insufficient-hair',coverage,mask:null};
  if(coverage>Math.floor(n*.38))return {eligible:false,reason:'oversized-removal',coverage,mask:null};
+ // Avoid a cropped-off inpainting mask: the GAN cannot reconstruct content
+ // outside its input crop, and would create a conspicuous straight seam.
+ const pad=Math.max(2,Math.round(Math.min(width,height)*.025));
+ let edgeCount=0;
+ for(let y=0;y<maxY;y++)for(let x=0;x<width;x++){
+  const i=y*width+x;
+  if(wanted[i]&&(x<pad||x>=width-pad||y<pad||y>=height-pad))edgeCount++;
+ }
+ if(edgeCount>Math.max(12,Math.floor(coverage*.025)))
+   return {eligible:false,reason:'crop-boundary',coverage,mask:null};
  const dilated=wanted.slice();
  for(let y=2;y<maxY-2;y++)for(let x=2;x<width-2;x++){
   const i=y*width+x;

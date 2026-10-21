@@ -19,7 +19,7 @@ for(const file of files){
  const payload=await fs.readFile(path.join(vendor,file));
  if(payload.length<1024||payload.length>maxStaticAsset)
   throw Error('Unsupported Cloudflare static asset size for '+file+': '+payload.length);
- if(file.endsWith('.wasm')&&payload.toString('ascii',0,4)!=='\\0asm'.replace('\\0','\0'))
+ if(file.endsWith('.wasm')&&(payload[0]!==0||payload.toString('ascii',1,4)!=='asm'))
   throw Error('Invalid WASM header: '+file);
  const location=path.join(dest,'runtime',file);
  await fs.writeFile(location,payload);

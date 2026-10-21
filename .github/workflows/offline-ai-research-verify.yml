@@ -18,6 +18,19 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run build
       - run: npm run test:unit
+      - name: Install headless browser test dependencies
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Verify genuine browser-only hair segmentation
+        run: node scripts/real-browser-inference-smoke.mjs
+      - name: Package complete offline website
+        uses: actions/upload-artifact@v4
+        with:
+          name: hananeh-offline-research-site
+          path: public/
+          retention-days: 14
+          if-no-files-found: error
       - name: Verify complete offline model assets
         run: |
           test -s public/ai/models/hair_segmenter.tflite

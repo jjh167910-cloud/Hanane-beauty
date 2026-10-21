@@ -6,13 +6,23 @@ import {test} from 'node:test';
 // Run the shipped worker handlers with real file bytes and Response objects.
 // This covers cache routing and failure recovery; Android browser behavior still
 // requires device testing.
-function worker(){
+function markRedirected(response){
+  const clone=response.clone.bind(response);
+  Object.defineProperty(response,'redirected',{value:true});
+  response.clone=()=>markRedirected(clone());
+  return response;
+}
+function worker({redirectIndex=false}={}){
   const origin='https://offline.test/',handlers={},stores=new Map();let online=true;
   const key=request=>new URL(typeof request==='string'?request:request.url,origin).href;
   const network=async request=>{
     if(!online)throw Error('Offline');
     const pathname=new URL(key(request)).pathname;
-    try{return new Response(await fs.readFile(new URL('../public'+(pathname==='/'?'/index.html':pathname),import.meta.url)))}
+    try{
+      const response=new Response(await fs.readFile(new URL('../public'+(pathname==='/'?'/index.html':pathname),import.meta.url)));
+      if(redirectIndex && pathname==='/index.html')markRedirected(response);
+      return response;
+    }
     catch{return new Response('Not found',{status:404})}
   };
   const caches={
@@ -55,4 +65,18 @@ test('Offline navigation falls back to cached homepage',async()=>{
   const w=worker();await w.dispatch('install');w.setOffline();
   const response=await w.dispatch('fetch',{request:{url:'https://offline.test/consultation',method:'GET',mode:'navigate'}});
   assert.equal(response.status,200);assert.match(await response.text(),/lang="fa" dir="rtl"/);
+});
+
+// Cloudflare follows /index.html -> / during precaching. A navigation with
+// redirect mode manual cannot consume that followed-redirect response.
+test('Installed app can launch offline at legacy index URL after Cloudflare redirect',async()=>{
+  const w=worker({redirectIndex:true});await w.dispatch('install');w.setOffline();
+  const response=await w.dispatch('fetch',{request:{url:'https://offline.test/index.html',method:'GET',mode:'navigate',redirect:'manual'}});
+  assert.equal(response.status,200);assert.equal(response.redirected,false);
+  assert.match(await response.text(),/lang="fa" dir="rtl"/);
+});
+
+test('New installs launch at the canonical root and retain their app identity',async()=>{
+  const manifest=JSON.parse(await fs.readFile(new URL('../public/manifest.webmanifest',import.meta.url),'utf8'));
+  assert.equal(manifest.start_url,'./');assert.equal(manifest.id,'./index.html');
 });

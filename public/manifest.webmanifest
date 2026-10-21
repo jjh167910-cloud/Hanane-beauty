@@ -2,7 +2,7 @@
   "name": "حنانه بیوتی | مدل مو روی چهره من",
   "short_name": "حنانه بیوتی",
   "id": "./index.html",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f7f2eb",

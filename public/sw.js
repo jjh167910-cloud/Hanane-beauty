@@ -4,9 +4,14 @@
  * Every script pack contains pre-bundled images, so success means the complete
  * catalog can open without a network connection (until browser data is evicted).
  */
-const VERSION='hananeh-static-20261021-v4';
+const VERSION='hananeh-static-20261021-v5';
 const PACKS=Array.from({length:14},(_,i)=>'./data/pack-'+String(i+1).padStart(2,'0')+'.js');
 const CORE=['./','./index.html','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png',...PACKS];
+// Browsers reject followed-redirect responses for some offline navigations.
+function navigationResponse(response){
+  if(!response?.redirected)return response;
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers:response.headers});
+}
 async function send(client,message){try{client?.postMessage(message)}catch(_){}}
 async function auditCache(client){
   const cache=await caches.open(VERSION);
@@ -54,13 +59,13 @@ self.addEventListener('fetch',event=>{
   event.respondWith((async()=>{
     const cache=await caches.open(VERSION);
     const cached=await cache.match(req,{ignoreSearch:true});
-    if(cached)return cached;
+    if(cached)return req.mode==='navigate'?navigationResponse(cached):cached;
     try{
       const response=await fetch(req);
       if(response.ok)await cache.put(req,response.clone());
       return response;
     }catch(_){
-      if(req.mode==='navigate')return (await cache.match('./index.html'))||Response.error();
+      if(req.mode==='navigate')return navigationResponse((await cache.match('./'))||(await cache.match('./index.html')))||Response.error();
       return Response.error();
     }
   })());

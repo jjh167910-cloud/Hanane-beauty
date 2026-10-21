@@ -56,6 +56,8 @@ test('Missing catalog pack is reported and cache repair restores it',async()=>{
   await (await w.caches.open(name)).delete('./data/pack-14.js');
   const messages=[],source={postMessage:m=>messages.push(m)};
   await w.dispatch('message',{source,data:{type:'CACHE_STATUS'}});
+  assert.equal(typeof messages.at(-1).aiReady,'boolean');
+  assert.equal(messages.at(-1).aiTotal,9);
   assert.equal(messages.at(-1).ready,false);assert.deepEqual(Array.from(messages.at(-1).missing),['./data/pack-14.js']);
   await w.dispatch('message',{source,data:{type:'CACHE_REPAIR'}});
   assert.equal(messages.at(-1).type,'CACHE_FINISHED');assert.equal(messages.at(-1).ready,true);

@@ -28,3 +28,6 @@ Rejected, oversized and corrupt replacement photos now clear the old preview, re
 
 ## v0.4.0 MediaPipe offline AI integration
 Added browser-only hair extraction using the pinned `@mediapipe/tasks-vision@0.10.32` runtime and Google's HairSegmenter. New `npm run build` stage vendors WASM plus model into `public/ai`. PWA caches them opportunistically and independently of the core offline catalog, with separate AI audit fields and an approximate fallback. The model and runtime are **not committed as binary files**; the Cloudflare build must execute `npm install && npm run build`. No in-browser, Android or live-deployment verification is implied by this source commit. New pure regression tests cover confidence masks and bundle composition.
+
+## Eye landmark augmentation
+Source commit added offline BlazeFace short-range face detection, normalized eye anchoring, and image-local fallback (a single non-hair photograph no longer permanently disables the segmentation engine). 9 optional AI assets now include two TFLite models. Offline audit checks core app and AI bundle independently. Added face anchor and cache-count regression expectations. Build/run verification and live redeploy still pending.

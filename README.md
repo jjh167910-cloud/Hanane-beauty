@@ -64,3 +64,6 @@ npm test
 npx wrangler deploy
 ```
 The `build` command copies a pinned local MediaPipe runtime and downloads Google's versioned HairSegmenter model to `public/ai/`. The browser imports only same-origin assets. The service worker caches these as optional assets and reports `aiReady` separately from the catalog's offline status; Android memory limits, segmentation accuracy and actual offline AI inference require physical-device validation. Third-party MediaPipe/model licensing and attribution should be reviewed before commercial release. Cloudflare builds must use `npm run build` (not `npm test` alone) to include the AI assets.
+
+### Eye-landmark registration
+The build also bundles the Google BlazeFace short-range detector. It supplies a normalized eye center and eye distance for matching the chosen style to the customer's portrait. Detection is entirely on-device. If either model or detection fails, manual alignment and the approximate fallback remain functional. Catalog offline readiness and AI asset readiness are reported separately.

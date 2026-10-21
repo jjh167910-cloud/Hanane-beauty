@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {buildConfidenceMask} from '../public/ai/mask-utils.mjs';
+import {buildConfidenceMask,faceAnchor} from '../public/ai/mask-utils.mjs';
 import fs from 'node:fs';
 
 test('Confidence mask assigns transparent and opaque hair pixels',()=>{
@@ -26,7 +26,7 @@ test('The shipped AI loader only references local assets at runtime',()=>{
   assert.doesNotMatch(source,/https?:\/\//);
 });
 test('Build output includes local model and WASM when build has run',()=>{
-  const files=['models/hair_segmenter.tflite','wasm/vision_wasm_internal.wasm',
+  const files=['models/hair_segmenter.tflite','models/blaze_face_short_range.tflite','wasm/vision_wasm_internal.wasm',
     'wasm/vision_wasm_internal.js','wasm/vision_wasm_nosimd_internal.wasm',
     'wasm/vision_wasm_nosimd_internal.js','vendor/vision_bundle.mjs'];
   const root=new URL('../public/ai/',import.meta.url);
@@ -36,4 +36,15 @@ test('Build output includes local model and WASM when build has run',()=>{
     const model=fs.readFileSync(new URL(files[0],root));
     assert.equal(model.toString('ascii',4,8),'TFL3');
   }
+});
+
+test('Eye-distance anchors improve automatic registration with valid face detections',()=>{
+  const detected=faceAnchor([{categories:[{score:.95}],keypoints:[
+    {x:.35,y:.36},{x:.62,y:.35},{x:.48,y:.48}
+  ]}]);
+  assert.ok(detected);
+  assert.ok(Math.abs(detected.eyeX-.485)<.0001);
+  assert.ok(Math.abs(detected.eyeDistance-.27)<.0001);
+  assert.equal(faceAnchor([{keypoints:[{x:.5,y:.5},{x:.51,y:.5}]}]),null);
+  assert.equal(faceAnchor([]),null);
 });

@@ -74,14 +74,22 @@ try{
    const dm=differenceMaskStudy({...props,alignment:'eye-scale'});
    const rolled=differenceMaskStudy({...props,alignment:'eye-similarity'});
    const anatomical=differenceMaskStudy({...props,alignment:'eye-similarity',faceProtection:'landmark-core'});
-   if(!presented&&dm.labels){
-    const canvas=document.createElement('canvas');canvas.width=canvas.height=dim;
-    canvas.style.cssText='max-width:512px;width:100%;display:block;margin:12px auto;border:1px solid #ddd';
-    canvas.setAttribute('aria-label','Source/reference hair topology, NOT generated hairstyle');
-    const ctx=canvas.getContext('2d');
-    ctx.putImageData(new ImageData(mapTopologyToRGBA(dm),dim,dim),0,0);
-    document.body.appendChild(canvas);
-    presented=true;
+   if(!presented&&a==='2'&&b==='6'&&dm.labels&&anatomical.labels){
+    const section=document.createElement('section');
+    section.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px;max-width:1050px;margin:auto';
+    for(const [name,result] of [
+      ['Legacy broad face ellipse — research topology',dm],
+      ['Landmark core + unresolved forehead (teal) — NOT safe for export',anatomical]]){
+      const frame=document.createElement('div');
+      const title=document.createElement('p');title.textContent=name;
+      title.style.cssText='font-weight:700;font-size:13px;line-height:1.5';
+      const canvas=document.createElement('canvas');canvas.width=canvas.height=dim;
+      canvas.style.cssText='width:100%;display:block;background:#fff;border:1px solid #ddd';
+      canvas.setAttribute('aria-label',name);
+      canvas.getContext('2d').putImageData(new ImageData(mapTopologyToRGBA(result),dim,dim),0,0);
+      frame.append(title,canvas);section.append(frame);
+    }
+    document.body.appendChild(section);presented=true;
    }
    return {pair:a+'-'+b,accepted:dm.ok,reason:dm.reason,scaleRatio:dm.scaleRatio,
     counts:dm.counts,measures:dm.measures,
@@ -92,6 +100,7 @@ try{
      hasValidatedFaceAnatomy:!String(anatomical.reason).includes('geometry'),
      eligibleForAutomatedEditing:anatomical.eligibleForAutomatedEditing===true,
      manualReviewRequired:anatomical.manualReviewRequired===true,
+     coreConflictReviewRisk:anatomical.measures?.conflictFraction>.05?'high_exploratory':'review',
      counts:anatomical.counts,measures:anatomical.measures},
     referenceHairstyleGenerated:dm.referenceHairstyleGenerated};
   });
@@ -135,11 +144,14 @@ try{
   rollAccepted:first.evaluations.filter(x=>x.rollAblation?.accepted).length,
   anatomyAccepted:first.evaluations.filter(x=>x.landmarkAblation?.accepted).length,
   anatomyReady:first.evaluations.filter(x=>x.landmarkAblation?.hasValidatedFaceAnatomy).length,
+  anatomyManualReview:first.evaluations.filter(x=>x.landmarkAblation?.manualReviewRequired).length,
+  anatomyHighCoreConflictReview:first.evaluations.filter(x=>x.landmarkAblation?.coreConflictReviewRisk==='high_exploratory').length,
   results:first.evaluations.map(x=>({pair:x.pair,accepted:x.accepted,reason:x.reason,
   measures:x.measures,rollAccepted:x.rollAblation?.accepted,
   rollReason:x.rollAblation?.reason,rollMeasures:x.rollAblation?.measures,
   landmarkAccepted:x.landmarkAblation?.accepted,
   landmarkReason:x.landmarkAblation?.reason,
   reviewOnly:x.landmarkAblation?.manualReviewRequired,
+  coreConflictReviewRisk:x.landmarkAblation?.coreConflictReviewRisk,
   landmarkMeasures:x.landmarkAblation?.measures}))}));
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

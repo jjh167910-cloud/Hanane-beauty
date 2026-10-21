@@ -7,9 +7,9 @@ import {fitPoseFlow,fromFrame,transferSupportMask,maskMetrics} from '../public/a
 export function rng(seed){let state=seed>>>0;return ()=>{state+=0x6d2b79f5;let t=state;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 const between=(r,a,b)=>a+(b-a)*r();
 function geometry(yaw,u,v,head){
- const wobble=head.wobble;
- return [u+yaw*(.18+.28*v+.075*u*u)+yaw*yaw*(.075*u*v)+wobble*yaw*v*v,
-  v+yaw*(.075*u+.065*u*v)+yaw*yaw*.04*v+wobble*.25*yaw*u*u];
+ const wobble=head.wobble,orientation=head.family==='alternate'?-0.7:1;
+ return [u+yaw*orientation*(.18+.28*v+.075*u*u)+yaw*yaw*(.075*u*v)+wobble*yaw*v*v,
+  v+yaw*orientation*(.075*u+.065*u*v)+yaw*yaw*.04*v+wobble*.25*yaw*u*u];
 }
 function invert(x,y,yaw,head){
  let u=x,v=y;
@@ -36,6 +36,7 @@ function pair(r,identity,options={}){
   fringe:between(r,0,1),part:between(r,-.14,.14),length:between(r,.2,1.1)};
  const source=person(r,identity,style,options),reference=person(r,identity,style,options);
  reference.wobble=source.wobble;
+ source.family=reference.family=options.family||'main';
  return {source,reference,identity};
 }
 function render(face,size){
@@ -61,7 +62,7 @@ export function runStudy(){
    samples.push({u:rx,v:ry,source,reference,dx:sx-rx,dy:sy-ry});
   }
  }
- const model=fitPoseFlow(samples,{ridge:.02}),size=96,heldOut=[],shifted=[];
+ const model=fitPoseFlow(samples,{ridge:.02}),size=96,heldOut=[],shifted=[],counterfactual=[];
  const evaluate=(destination,prefix,count,options)=>{
   for(let i=0;i<count;i++){
    const p=pair(t,prefix+'-'+i,options);
@@ -75,6 +76,7 @@ export function runStudy(){
  };
  evaluate(heldOut,'test',250,{});
  evaluate(shifted,'ood',130,{yawRange:1.12,shiftWobble:.30});
+ evaluate(counterfactual,'other-family',90,{family:'alternate'});
  const modes=['eye-scale','similarity','learned'];
  const metrics=Object.fromEntries(modes.map(k=>[k,{
   meanIoU:mean(heldOut.map(p=>p.metrics[k].iou||0)),
@@ -92,6 +94,11 @@ export function runStudy(){
    baselineMeanIoU:mean(shifted.map(p=>p.metrics.similarity.iou||0)),
    learnedMeanIoU:mean(shifted.map(p=>p.metrics.learned.iou||0)),
    independentlyValidated:false},
+  counterfactualProjection:{identities:counterfactual.length,
+   geometricFamily:'reverse_yaw_shear_not_present_in_training',
+   baselineMeanIoU:mean(counterfactual.map(p=>p.metrics.similarity.iou||0)),
+   learnedMeanIoU:mean(counterfactual.map(p=>p.metrics.learned.iou||0)),
+   interpretation:'Adversarial simulation-only control demonstrates learned non-robustness.'},
   heldOutIndividualResults:heldOut.map(p=>({subjectId:p.subjectId,
    yawDifference:p.yawDifference,...Object.fromEntries(modes.map(k=>[k+'IoU',p.metrics[k].iou]))})),
   realPortraitsProcessed:0,realPhotoGroundTruth:false,androidMeasured:false,
@@ -111,6 +118,8 @@ export function runStudy(){
   baselineMeanIoU:metrics.similarity.meanIoU,learnedMeanIoU:metrics.learned.meanIoU,
   shiftedBaselineIoU:evidence.outOfDistributionStress.baselineMeanIoU,
   shiftedLearnedIoU:evidence.outOfDistributionStress.learnedMeanIoU,
+  counterfactualBaselineIoU:evidence.counterfactualProjection.baselineMeanIoU,
+  counterfactualLearnedIoU:evidence.counterfactualProjection.learnedMeanIoU,
   realImagesUsed:0,trainedHairGenerator:false}));
  return evidence;
 }

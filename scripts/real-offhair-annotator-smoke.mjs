@@ -61,7 +61,16 @@ try{
   await stroke(4,.42,.15);
   await stroke(16,.48,.29);
   const count=Number((await page.locator('#annotated').textContent()).replaceAll(',',''));
-  assert.ok(count>=100,'UI did not paint enough mask pixels');
+  if(count<100){
+    const debug=await page.evaluate(()=>({
+      loaded:!document.getElementById('clear').disabled,
+      status:document.getElementById('status').textContent,
+      annotated:document.getElementById('annotated').textContent,
+      canvasRect:document.getElementById('overlay').getBoundingClientRect().toJSON(),
+      selected:[...document.querySelectorAll('[data-bit]')].filter(x=>x.getAttribute('aria-pressed')==='true').map(x=>x.dataset.bit)
+    }));
+    throw Error('UI did not paint enough mask pixels: '+JSON.stringify(debug));
+  }
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#save').click();
   const download=await downloadPromise,downloadPath=await download.path();

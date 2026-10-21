@@ -205,7 +205,7 @@ test('Stylist controls invalidate neural reconstruction when head placement chan
 });
 test('Neural readiness never enables inference with uncertain segmentation',()=>{
  const a=app();
- a.run("neuralInstalled=true;hasResult=true;userMask={estimated:true};referenceMask={estimated:false};faceUser={eyeX:.5,eyeY:.4,eyeDistance:.2};updateNeuralButtons()");
+ a.run("neuralInstalled=true;neuralVerified=true;hasResult=true;userMask={estimated:true};referenceMask={estimated:false};faceUser={eyeX:.5,eyeY:.4,eyeDistance:.2};updateNeuralButtons()");
  assert.equal(a.elements.get('neuralRun').disabled,true);
  a.run("userMask={estimated:false};updateNeuralButtons()");
  assert.equal(a.elements.get('neuralRun').disabled,false);
@@ -236,4 +236,20 @@ test('Uploading an invalid replacement still terminates the previous neural infe
  assert.equal(a.run('neuralWorker'),null);
  assert.equal(a.run('neuralLayer'),null);
  assert.equal(a.run('hasResult'),false);
+});
+
+test('Neural inference stays disabled until real synthetic model verification passes',()=>{
+ const a=app();
+ a.run("neuralInstalled=true;neuralVerified=false;hasResult=true;userImage={};userMask={mask:{},estimated:false};referenceMask={mask:{},estimated:false};faceUser={yaw:.01,eyeX:.5,eyeY:.4,eyeDistance:.2};faceRef={yaw:.02};qualityCore={poseCompatibility:()=>({mismatch:false})};updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,true);
+ assert.equal(a.elements.get('neuralTest').disabled,false);
+ a.run("neuralVerified=true;updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,false);
+ assert.equal(a.elements.get('neuralTest').disabled,true);
+});
+test('Canceling an in-flight worker revokes its old neural verification',()=>{
+ const a=app();a.scope.killed=0;
+ a.run("neuralVerified=true;neuralWorker={terminate:()=>killed++};cancelNeuralInference()");
+ assert.equal(a.run('neuralVerified'),false);
+ assert.equal(a.scope.killed,1);
 });

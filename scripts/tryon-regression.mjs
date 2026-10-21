@@ -107,3 +107,30 @@ test('Corrupt portrait leaves the canvas in an empty state',async()=>{
   assert.equal(a.elements.get('canvasPlaceholder').style.display,'flex');
   assert.equal(a.elements.get('saveBtn').disabled,true);
 });
+
+test('Large portrait keeps bounded 2x source resolution for final export',async()=>{
+ const a=app();a.scope.photo={width:3000,height:4000,naturalWidth:3000,naturalHeight:4000};
+ a.scope.window.HananehExport={exportScale:()=>2};
+ a.run('loadImage=async()=>photo');
+ await a.run("uploadFile({type:'image/jpeg',size:2000})");
+ assert.equal(a.run('exportPhoto.width'),1536);
+ assert.equal(a.run('exportPhoto.height'),1920);
+ assert.equal(a.run('exportFactor'),2);
+ assert.equal(a.run('userImage.width'),768);
+ assert.equal(a.run('userImage.height'),960);
+});
+test('Small portrait does not create a wasteful high-res export canvas',async()=>{
+ const a=app();a.scope.photo={width:384,height:480,naturalWidth:384,naturalHeight:480};
+ a.scope.window.HananehExport={exportScale:()=>1};
+ a.run('loadImage=async()=>photo');
+ await a.run("uploadFile({type:'image/jpeg',size:2000})");
+ assert.equal(a.run('exportPhoto'),null);
+ assert.equal(a.run('exportFactor'),1);
+});
+test('Replacing a portrait clears retained high-res pixels of the previous person',async()=>{
+ const a=app();a.run("exportPhoto={width:1536,height:1920};exportFactor=2;userImage={oldPhoto:true}");
+ await a.run("uploadFile({type:'text/plain',name:'invalid.txt',size:200})");
+ assert.equal(a.run('exportPhoto'),null);
+ assert.equal(a.run('exportFactor'),1);
+ assert.equal(a.run('userImage'),null);
+});

@@ -25,3 +25,6 @@ Browser try-on remains approximate non-AI compositing. Neither a verified segmen
 
 ## Follow-up: replacement portrait safety
 Rejected, oversized and corrupt replacement photos now clear the old preview, restore the empty placeholder and disable old exports instead of retaining another person's image on screen. Photo input without a trustworthy MIME type can also be accepted by a supported image filename and is still subject to actual decode. Added three deterministic regression tests; new cache key v7. This is a source change, not evidence of an Android browser run or a live Cloudflare redeploy.
+
+## v0.4.0 MediaPipe offline AI integration
+Added browser-only hair extraction using the pinned `@mediapipe/tasks-vision@0.10.32` runtime and Google's HairSegmenter. New `npm run build` stage vendors WASM plus model into `public/ai`. PWA caches them opportunistically and independently of the core offline catalog, with separate AI audit fields and an approximate fallback. The model and runtime are **not committed as binary files**; the Cloudflare build must execute `npm install && npm run build`. No in-browser, Android or live-deployment verification is implied by this source commit. New pure regression tests cover confidence masks and bundle composition.

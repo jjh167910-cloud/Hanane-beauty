@@ -52,3 +52,15 @@ Run `npm test` to validate 265 families, 270 local WebP images, image references
 - `npm test` now runs five try-on regressions and three service-worker integration tests in addition to catalog integrity checks, using Node built-ins only.
 
 This session could not run Chromium browser checks because no browser executable was installed and the browser download failed. The service-worker integration tests run real worker handlers against local app bytes, but do not replace real Android Chrome checks. Cloudflare returned a missing-permissions / reauthentication error while checking deployment; no deployment was created or verified in this session.
+
+## Offline web AI hair segmentation (v0.4.0 source integration)
+The optional Web MediaPipe HairSegmenter now extracts hair alpha locally when its assets have been built and cached. This is segmentation-assisted **compositing**, not generative hairstyle replacement or validated photorealism. The approximate fallback remains usable on unsupported devices.
+
+Build before deploying:
+```sh
+npm install
+npm run build
+npm test
+npx wrangler deploy
+```
+The `build` command copies a pinned local MediaPipe runtime and downloads Google's versioned HairSegmenter model to `public/ai/`. The browser imports only same-origin assets. The service worker caches these as optional assets and reports `aiReady` separately from the catalog's offline status; Android memory limits, segmentation accuracy and actual offline AI inference require physical-device validation. Third-party MediaPipe/model licensing and attribution should be reviewed before commercial release. Cloudflare builds must use `npm run build` (not `npm test` alone) to include the AI assets.

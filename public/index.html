@@ -50,7 +50,7 @@ const PREVIEW_W=768,PREVIEW_H=960;
 const resultCanvas=$('resultCanvas'),ctx=resultCanvas.getContext('2d',{willReadFrequently:true});
 const refCache=new Map(),tasks=new Map();let nextReq=0;let busy=false;
 const native=!!(window.AndroidAI&&typeof window.AndroidAI.segment==='function');
-$('aiStatus').textContent=native?'موتور تشخیص مو با AI آماده بررسی است · پردازش فقط روی گوشی':'حالت وب: پیش‌نمایش ترکیبی تقریبی، بدون هوش مصنوعی مولد یا تشخیص موی AI. تمام پردازش روی همین دستگاه انجام می‌شود.';
+$('aiStatus').textContent=native?'موتور تشخیص مو با AI آماده بررسی است · پردازش فقط روی گوشی':'پردازش فقط روی گوشی انجام می‌شود؛ اگر بسته هوش مصنوعی آفلاین نصب باشد، استخراج مو با AI فعال می‌شود. تولید موی فوتورئال هنوز در دسترس نیست.';
 const CANVAS_SIZE=512;
 function updateBtn(){ $('generateBtn').disabled=!(userImage&&selected)||busy||loadingPhoto; }
 function setProgress(s){$('progress').textContent=s;}
@@ -75,10 +75,32 @@ function fallbackMask(image){const data=downscaleToMask(image).data;const c=docu
   im.data[i]=im.data[i+1]=im.data[i+2]=likely;im.data[i+3]=255;
  }
  x.putImageData(im,0,0);return {mask:c,face:null,estimated:true};}
-async function getMask(image, cacheKey){if(refCache.has(cacheKey))return refCache.get(cacheKey);let value;
- if(native){const r=await nativeSegment(dataUrlFromImage(image));value={mask:await loadImage(r.mask),face:r.face||null,estimated:false};}
- else value=fallbackMask(image);
- if(cacheKey.startsWith('ref_'))refCache.set(cacheKey,value);return value;}
+async let webHairPromise=null,webHairDisabled=false;
+async function getWebHairMask(image){
+ if(webHairDisabled)return null;
+ try{
+  if(!webHairPromise)webHairPromise=import('./ai/hair-segmenter.mjs').then(m=>m.getLocalHairSegmenter());
+  const segmenter=await webHairPromise;
+  return segmenter.segment(image);
+ }catch(error){
+  console.warn('Optional offline hair segmentation unavailable:',error);
+  webHairDisabled=true;webHairPromise=null;
+  return null;
+ }
+}
+async function getMask(image,cacheKey){
+ if(refCache.has(cacheKey))return refCache.get(cacheKey);
+ let value;
+ if(native){
+  const r=await nativeSegment(dataUrlFromImage(image));
+  value={mask:await loadImage(r.mask),face:r.face||null,estimated:false};
+ }else{
+  const mask=await getWebHairMask(image);
+  value=mask?{mask,face:null,estimated:false}:fallbackMask(image);
+ }
+ if(cacheKey.startsWith('ref_'))refCache.set(cacheKey,value);
+ return value;
+}
 function maskBox(mask){const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(mask,0,0,512,512);const data=x.getImageData(0,0,512,512).data;let minX=511,minY=511,maxX=0,maxY=0,count=0;
  for(let y=5;y<512;y+=2)for(let px=4;px<512;px+=2){const k=4*(y*512+px);if(data[k]>115){minX=Math.min(minX,px);maxX=Math.max(maxX,px);minY=Math.min(minY,y);maxY=Math.max(maxY,y);count++;}}
  if(count<80)return {x:.22,y:.05,w:.56,h:.43,valid:false};return {x:minX/512,y:minY/512,w:(maxX-minX)/512,h:(maxY-minY)/512,valid:true};}
@@ -111,7 +133,7 @@ async function generate(){if(busy||loadingPhoto||!userImage||!selected)return;co
   referenceLayer=createHairLayer(refImage,referenceMask.mask);fitTransform();
   $('canvasPlaceholder').style.display='none';drawResult();hasResult=true;
   $('saveBtn').disabled=false;
-  setProgress(native?'پیش‌نمایش با استخراج AI مو آماده است. در صورت نیاز جایگذاری را تنظیم کنید.':'پیش‌نمایش تقریبی آماده است. این حالت از مدل AI استفاده نمی‌کند.');
+  setProgress(native?'پیش‌نمایش با استخراج AI مو آماده است. در صورت نیاز جایگذاری را تنظیم کنید.':(!userMask.estimated&&!referenceMask.estimated?'پیش‌نمایش با استخراج موی AI آفلاین آماده است؛ مدل مو هنوز فقط ترکیب تصویری است.':'پیش‌نمایش تقریبی آماده است؛ موتور تشخیص مو در این دستگاه در دسترس نیست.'));
  }catch(e){if(revision===inputRevision){setProgress('امکان ساخت پیش‌نمایش نبود: '+e.message);hasResult=false;}}
  finally{busy=false;updateBtn();if(previewQueued){previewQueued=false;requestPreview();}}}
 async function uploadFile(file){if(!file)return;

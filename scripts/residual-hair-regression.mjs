@@ -57,3 +57,28 @@ test('New repair module is precached and optional in the customer UI',()=>{
  assert.match(page,/import\('\.\/ai\/residual-hair-repair\.mjs'\)/);
  assert.doesNotMatch(module,/https?:\/\//);
 });
+
+test('Large old hairstyles cannot be blindly erased even on plain backgrounds',()=>{
+ const width=240,height=240;
+ const portrait=new Uint8ClampedArray(width*height*4);
+ const original=new Uint8ClampedArray(width*height*4);
+ const projected=new Uint8ClampedArray(width*height*4);
+ const protection=new Uint8ClampedArray(width*height);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const k=4*(y*width+x);portrait[k]=210;portrait[k+1]=205;portrait[k+2]=200;portrait[k+3]=255;
+  if(y>=30&&y<145&&x>=35&&x<155){
+   original[k]=255;portrait[k]=45;portrait[k+1]=40;portrait[k+2]=35;
+  }
+ }
+ const out=repairSmallHairPatches(portrait,original,projected,protection,width,height);
+ assert.ok(out.considered>9000);
+ assert.equal(out.corrected,0);
+ assert.ok(out.rejected>0);
+});
+test('Repair keeps uploaded source and segmentation buffers immutable',()=>{
+ const f=fixture();
+ const before=f.portrait.slice(),mask=f.original.slice();
+ repairSmallHairPatches(...Object.values(f));
+ assert.deepEqual(f.portrait,before);
+ assert.deepEqual(f.original,mask);
+});

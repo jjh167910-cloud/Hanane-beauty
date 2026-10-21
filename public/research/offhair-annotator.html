@@ -144,6 +144,7 @@ async function loadImage(src,origin){
 $('photo').addEventListener('change',async e=>{
  const file=e.target.files?.[0];if(!file)return;
  if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>15*1024*1024){
+  loaded=false;hash='';ctx.clearRect(0,0,S,S);reset();
   setStatus('Unsupported image or file above 15 MB',true);return;
  }
  const objectUrl=URL.createObjectURL(file);
@@ -159,7 +160,7 @@ $('save').addEventListener('click',()=>{
  if(!loaded||!$('ack').checked){setStatus('Review the provenance acknowledgement before exporting.',true);return;}
  try{
   const annotation=makeAnnotation({labels:mask,width:S,height:S,portraitSha256:hash,
-   annotationId:'annotation-'+String(counter).padStart(3,'0'),
+   annotationId:'annotation-'+crypto.randomUUID(),
    subjectId:$('subject').value.trim(),annotatorId:$('annotator').value.trim(),
    consentRecordId:$('consent').value.trim(),rightsRecordId:$('rights').value.trim(),
    annotationTimeUtc:new Date().toISOString(),photoOrigin:sampleOrigin,studySplit:$('split').value});

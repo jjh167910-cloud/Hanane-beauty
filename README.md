@@ -11,8 +11,11 @@ A Persian right-to-left, mobile-first **static Progressive Web App**.
 ## Limits — read before customer use
 **The current try-on mode is an approximate, NON-AI overlay.** It is NOT photorealistic hairstyle transfer. The planned MediaPipe segmentation / local generative model is **not bundled or production-verified in this release**. Don't claim realistic AI try-on is available. It is a visual consultation aid only.
 
+## Offline readiness in the app
+After the first HTTPS visit, the service worker caches all **14 image packs** plus the catalog, homepage, icon and manifest. The homepage now displays a real cache-audit result and includes a **repair cache** control. An installed PWA is offline-ready only when it reports all core files stored; Chrome may evict site storage later.
+
 ## Deploy on Cloudflare Workers
-- Build command: **none**
+- Build command: **`npm test`** (recommended validation, uses only Node.js built-ins; optional: none)
 - Deploy command: `npx wrangler deploy`
 - Root directory: `/`
 - Wrangler reads `wrangler.toml` and serves files from `./public`.
@@ -21,6 +24,7 @@ A Persian right-to-left, mobile-first **static Progressive Web App**.
 
 ## Local testing
 ```sh
+npm test
 cd public
 python -m http.server 8000
 ```
@@ -33,3 +37,9 @@ User photos remain in the device's browser memory; results are downloaded only w
 - Source catalog and UI have been browser-tested in the artifact workspace.
 - The private GitHub repository commit does **not** prove a successful Cloudflare deploy.
 - HTTPS install and real Android Chrome airplane-mode behavior must be tested after deployment.
+
+## Current deployment checkpoint (2026-10-21)
+The connected GitHub repository has the app source and deployment configuration, but the connected Cloudflare account currently shows **no Worker or Pages project named `hanane-beauty`**. A successful GitHub commit alone does not publish the app. Cloudflare Workers Builds must be connected to this repository (or `npx wrangler deploy` run with authorized credentials). Confirm the HTTPS deployment, install prompt, offline asset cache, Android airplane-mode behavior and image export on a real Android phone before calling the project production-ready.
+
+## Verification
+Run `npm test` to validate 265 families, 270 local WebP images, image references, PWA manifest, service-worker cache messaging, and JavaScript syntax. This static test does not prove photorealism, Android performance, or browser cache durability.

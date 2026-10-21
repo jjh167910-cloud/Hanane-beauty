@@ -73,6 +73,7 @@ try{
     width:dim,height:dim,sourceFace:x.face,referenceFace:y.face};
    const dm=differenceMaskStudy({...props,alignment:'eye-scale'});
    const rolled=differenceMaskStudy({...props,alignment:'eye-similarity'});
+   const anatomical=differenceMaskStudy({...props,alignment:'eye-similarity',faceProtection:'landmark-core'});
    if(!presented&&dm.labels){
     const canvas=document.createElement('canvas');canvas.width=canvas.height=dim;
     canvas.style.cssText='max-width:512px;width:100%;display:block;margin:12px auto;border:1px solid #ddd';
@@ -87,6 +88,11 @@ try{
     rollAblation:{accepted:rolled.ok,reason:rolled.reason,
      rollDifferenceRadians:rolled.rollDifferenceRadians,
      counts:rolled.counts,measures:rolled.measures},
+    landmarkAblation:{accepted:anatomical.ok,reason:anatomical.reason,
+     hasValidatedFaceAnatomy:!String(anatomical.reason).includes('geometry'),
+     eligibleForAutomatedEditing:anatomical.eligibleForAutomatedEditing===true,
+     manualReviewRequired:anatomical.manualReviewRequired===true,
+     counts:anatomical.counts,measures:anatomical.measures},
     referenceHairstyleGenerated:dm.referenceHairstyleGenerated};
   });
   return {observed:ids.map(id=>({id,hasRealMask:!!observations[id]?.mask,
@@ -101,6 +107,9 @@ try{
  for(const entry of first.evaluations)if(entry.counts){
   const c=entry.counts;assert.equal(
    c.remove+c.add+c.overlap+c.preserve+c.faceConflict,512*512);
+  const d=entry.landmarkAblation?.counts;
+  if(d)assert.equal(d.remove+d.add+d.overlap+d.preserve+
+    d.faceConflict+d.foreheadPending,512*512,'Anatomical topology must exhaust pixels');
   assert.equal(entry.referenceHairstyleGenerated,false);
  }
  assert.deepEqual(errors,[]);
@@ -124,7 +133,13 @@ try{
   analyzed: first.observed.length,measurable:first.evaluations.filter(x=>x.counts).length,
   accepted:first.evaluations.filter(x=>x.accepted).length,rejected:first.evaluations.filter(x=>!x.accepted).length,
   rollAccepted:first.evaluations.filter(x=>x.rollAblation?.accepted).length,
+  anatomyAccepted:first.evaluations.filter(x=>x.landmarkAblation?.accepted).length,
+  anatomyReady:first.evaluations.filter(x=>x.landmarkAblation?.hasValidatedFaceAnatomy).length,
   results:first.evaluations.map(x=>({pair:x.pair,accepted:x.accepted,reason:x.reason,
   measures:x.measures,rollAccepted:x.rollAblation?.accepted,
-  rollReason:x.rollAblation?.reason,rollMeasures:x.rollAblation?.measures}))}));
+  rollReason:x.rollAblation?.reason,rollMeasures:x.rollAblation?.measures,
+  landmarkAccepted:x.landmarkAblation?.accepted,
+  landmarkReason:x.landmarkAblation?.reason,
+  reviewOnly:x.landmarkAblation?.manualReviewRequired,
+  landmarkMeasures:x.landmarkAblation?.measures}))}));
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

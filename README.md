@@ -67,3 +67,67 @@ The `build` command copies a pinned local MediaPipe runtime and downloads Google
 
 ### Eye-landmark registration
 The build also bundles the Google BlazeFace short-range detector. It supplies a normalized eye center and eye distance for matching the chosen style to the customer's portrait. Detection is entirely on-device. If either model or detection fails, manual alignment and the approximate fallback remain functional. Catalog offline readiness and AI asset readiness are reported separately.
+
+
+## Quality compositor V2 (experimental; offline, not generative)
+
+The quality branch adds **face-region preservation**: the customer's original eye/nose/mouth pixels can be layered above the hairstyle, using a softly feathered face ellipse anchored to local BlazeFace eyes. Users can turn this off for bangs/fringes. Eye-line tilt also drives bounded hairstyle rotation. A local mask-coverage metric warns when the customer's existing hair extends outside the desired hairstyle; it does **not** magically remove that hair.
+
+The JPEG exporter is decoupled from the Before/After toggle and uses the decoded source photo at up to 1536×1920 when its resolution is sufficient. Hairstyle textures remain based on the 512px reference bank, so this change chiefly protects portrait/background clarity rather than adding hair detail. If high-resolution export runs out of memory, the app falls back to the preview output.
+
+The pure quality functions live in `public/ai/quality-core.mjs` and are included in the offline service worker cache. Automated quality and export regressions are in `scripts/quality-regression.mjs` and `scripts/tryon-regression.mjs`.
+
+**Still not solved:** automatic removal of the customer's previous long hair, synthesis of newly exposed background/scalp, hair relighting/shadow simulation, 3D pose-dependent occlusion, or realistic new strands. Actual salon-quality transfer requires an independently evaluated generative/inpainting engine. A passing source test alone is not visual proof. Never upload portraits to an online engine without explicit opt-in consent.
+
+### Conservative offline removal of residual strands (quality prototype)
+
+The `residual-hair-repair.mjs` module detects hair that remains visible outside the projected replacement hairstyle, and attempts **limited background-color reconstruction** only where the original background is locally uniform. It accepts existing HairSegmenter confidence masks and the BlazeFace face guard. It rejects noisy/background-inconsistent areas, large residual hair regions, and components touching the protected face; it does not invent a scalp, ears, or complex background. The customer can turn off the feature using the `ترمیم محدود موهای باقی‌مانده` toggle. Repair patches are discarded while dragging or changing hairstyle controls, then recalculated after placement settles.
+
+The repaired pixels are an offline 384×480 transparent overlay, drawn between the original photograph and the hairstyle, and are included in the photo export. This can reduce distracting hair fragments against plain salon backgrounds but does **not** solve long-to-short conversions, hair geometry, specular lighting, or generative transfer. Every preview remains a consultation approximation.
+
+Run `npm test` on the branch to execute the catalog/offline/image/face and residual-hair regression suites; static and pure JavaScript checks were performed during development. Visual accuracy must still be assessed on real portraits before this feature is promoted from a draft pull request to production.
+
+
+## Experimental offline neural inpainting (MI-GAN)
+
+The quality branch optionally uses **MI-GAN**, a small inpainting GAN designed for mobile devices, to reconstruct old hair visible beyond a selected style. This is a real neural background-restoration model, not a painted uniform-color patch. **It does not generate the new hairstyle**: hairstyles still come from the original 512px catalog references.
+
+- Model: `andraniksargsyan/migan`, `migan_pipeline_v2.onnx`, pinned Hugging Face revision `1538c135034b8cfe7a8472f34d09c8a5a45b17a7`, fixed SHA-256 `6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b`.
+- Licensing: MIT code and weights; upstream `Picsart-AI-Research/MI-GAN/LICENSE-WEIGHTS` and mirrored `public/ai/inpaint/LICENSE-WEIGHTS.txt`. ONNX Runtime Web is MIT; include its notices when commercially distributing.
+- Build: `npm test` calls `npm run build`, which assembles local MediaPipe assets, downloads/validates the 28,079,181-byte MI-GAN model, and splits it into three 12-MiB-or-smaller parts for Cloudflare's 25-MiB per-asset limit. The pinned `onnxruntime-web@1.23.2` WASM runtime is copied locally, without CDN references.
+- Offline installation: main salon PWA installs without the neural weight. The user explicitly taps **ذخیره موتور عصبی برای آفلاین** while online; the service worker downloads six optional local files into the version-independent `hananeh-hq-inpaint-model-v1` cache. Use offline after that. No photo files are uploaded.
+- Inference: separate browser Worker, SHA-256 verified model sharding, one WASM thread for compatibility, uint8 CHW `image` and `mask` inputs, output composed only over AI-approved hair pixels. A visible opt-in **ترمیم هوشمند موهای قبلی** runs only when real (non-heuristic) hair and face detection succeeds. Incorrect face coverage, excessive removed hair area, stale photo/style changes and model failures leave the existing preview intact.
+- Known limits: very large old hair, missing scalp/back-of-head and highly detailed lighting/strands may still look artificial; operating on a 512-pixel crop cannot reconstruct unlimited detail. Memory and runtime on Android phones remain **unverified**, and the inference path has **not been proven in a real phone browser**.
+
+**Do not merge the draft PR into `main` or advertise real-world photorealism** before the neural model has successfully loaded and inferred on target Android hardware and blinded visual A/B testing beats the existing app. Cloudflare static assets are only a delivery mechanism, not GPU inference. Do not create a remote photo-processing fallback without user opt-in.
+
+### Pose-compatibility and mobile cancellation (quality safety pass)
+
+The optional local face detector supplies **nose and eye keypoints**, permitting a rough left/right head-angle compatibility test (`poseCompatibility`). When the customer's pose differs substantially from the hairstyle reference, the app displays a Persian warning and disables experimental neural restoration for that pair. This is a conservative 2D proxy—not a full 3D face-pose solver.
+
+The expensive ONNX Worker is terminated, pending model tasks are rejected, and sensitive pixel buffers become eligible for release when a different portrait/style is selected, a hairstyle is moved mid-inference, or the browser page is hidden. Native browser memory recovery timing depends on the device.
+
+A second inpainting gate rejects masks that touch the top, sides or internal lower boundary of its 512px inference crop, preventing artificial horizontal lines where the reconstruction would abruptly stop. That means long hair extending beyond the safe crop may be **intentionally refused**, not erased.
+
+Verification in this pass: 28/28 targeted try-on interaction checks; 6/6 isolated MediaPipe mask/face regression checks; additional synthetic tests for pose and cropped reconstruction. This is **not** an Android inference/photorealism certification; the full project build and real-model image tests remain pending.
+
+
+### Actual on-device inference verification (new release gate)
+
+The experimental Persian consultation UI now includes **تست واقعی موتور روی گوشی** after the optional neural assets have finished caching. This test executes a real, synthetic MI-GAN ONNX 512×512 inference inside the local WASM Worker, checks the pinned model SHA-256, validates output shape and unmodified known pixels, and reports observed test duration to the user. It does **not use a customer's photo or upload any data**. Neural hair repair remains disabled until the smoke test succeeds on the current device/session. On Android without a supported module Worker or adequate RAM, the test fails gracefully and ordinary preview remains available.
+
+The output compositor now uses a bounded six-pixel interior alpha feather around inpainted regions. This smooths small seams; it cannot restore missing hairstyle detail or make the 512px reference haircut generative.
+
+The offline bundler now validates the WebAssembly magic header and exact contents SHA-256 of every shipped ONNX Runtime binary, enforces Cloudflare's 25 MiB per-file limit and records total bytes in `public/ai/inpaint/bundle.json`. The `neural-regression.mjs` release gate verifies these exact emitted files, not only JavaScript source declarations. This does **not** establish Android inferences have been run; real-device results are still required before merging.
+
+
+## Verified Cloudflare preview deployment (2026-10-21)
+
+Cloudflare feature-branch auto-build `98a175d1-54db-419d-8fb0-dfa7f79bc213` completed **successfully** on commit `e736d273e92b177f01d060f0e96f500d9722b069`.
+
+- Real `npm test` invoked `npm run build`, downloaded and SHA-verified MI-GAN from the **correct immutable Hugging Face commit** `1538c135034b8cfe7a8472f34d09c8a5a45b17a7` (the previously documented full SHA was incorrect and caused HTTP 404), packaged local ONNX Runtime Web and MediaPipe models, then passed **79/79 Node tests**.
+- Wrangler required a branch-only `[previews]` stanza, which was added to `wrangler.toml`. Cloudflare then uploaded all 15 changed static assets (including all three MI-GAN shards) and deployed the isolated preview successfully.
+- Preview URL: https://feature-quality-compositor-v2-hanane-beauty.mostifa2273.workers.dev/
+- Unique deployment URL: https://b48a7f4d-hanane-beauty.mostifa2273.workers.dev
+- Production `main` remains unaffected. Cloudflare success means build/package/deploy, **not** proven successful Android WASM inference or salon-quality generative hair. Device test required: open preview on intended Android Chrome, opt in to download neural model, tap `تست واقعی موتور روی گوشی`, then validate a real portrait/style and airplane-mode behavior. Do not publish private customer portraits or send them to external tools.
+- Some web crawlers cannot access Workers preview URLs, so no browser-level preview screenshot or independent GET verification was obtained in this run.

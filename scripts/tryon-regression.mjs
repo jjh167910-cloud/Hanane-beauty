@@ -12,7 +12,7 @@ function app(){
   const document={getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id)},addEventListener(){},createElement:element};
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
   const source=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)][0][1];
-  const scope={document,window:{OFFLINE_CATALOG:[]},Intl,console,URL:{createObjectURL:()=> 'blob:photo',revokeObjectURL(){}},setTimeout,Image:class{}};
+  const scope={document,window:{OFFLINE_CATALOG:[]},Intl,console,URL:{createObjectURL:()=> 'blob:photo',revokeObjectURL(){}},setTimeout,clearTimeout,Image:class{}};
   vm.createContext(scope);vm.runInContext(source,scope);
   return {run:code=>vm.runInContext(code,scope),scope,elements,draws};
 }
@@ -106,4 +106,180 @@ test('Corrupt portrait leaves the canvas in an empty state',async()=>{
   assert.equal(a.run('userImage'),null);
   assert.equal(a.elements.get('canvasPlaceholder').style.display,'flex');
   assert.equal(a.elements.get('saveBtn').disabled,true);
+});
+
+test('Preview preserves the original face after adding the style layer',()=>{
+ const a=app();
+ a.scope.photo={photo:true};a.scope.hair={hair:true};a.scope.face={face:true};
+ a.run("userImage=photo;referenceLayer=hair;faceLayer=face;fitted={x:300,y:300,s:1,refEyeX:200,refEyeY:150,rotation:0};$('protectFace').checked=true;$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;drawResult()");
+ const stack=a.draws.map(args=>args[0]);
+ assert.ok(stack.indexOf(a.scope.hair)>=0);
+ assert.ok(stack.indexOf(a.scope.face)>stack.indexOf(a.scope.hair));
+});
+
+test('Face-preservation toggle can disable the overlay for fringe styles',()=>{
+ const a=app();
+ a.scope.photo={photo:true};a.scope.hair={hair:true};a.scope.face={face:true};
+ a.run("userImage=photo;referenceLayer=hair;faceLayer=face;fitted={x:300,y:300,s:1,refEyeX:200,refEyeY:150,rotation:0};$('protectFace').checked=false;$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;drawResult()");
+ assert.ok(a.draws.some(args=>args[0]===a.scope.hair));
+ assert.equal(a.draws.some(args=>args[0]===a.scope.face),false);
+});
+
+test('Tilted reference and customer eyes produce bounded automatic orientation correction',()=>{
+ const a=app();
+ a.run("maskBox=()=>({x:.2,y:.1,w:.55,h:.40});userMask={mask:{}};referenceMask={mask:{}};faceUser={eyeX:.5,eyeY:.35,eyeDistance:.2,eyeSlope:.10};faceRef={eyeX:.5,eyeY:.35,eyeDistance:.2,eyeSlope:-.08};fitTransform()");
+ const rotation=a.run('fitted.rotation');
+ assert.ok(rotation>.15 && rotation<=.23);
+ assert.ok(Number.isFinite(a.run('fitted.s')));
+});
+
+test('Excessive original hair exposure yields a clear caution, not a realism claim',()=>{
+ const a=app();
+ a.run("userMask={estimated:false};referenceMask={estimated:false};updateQualityNotice({reliable:true,fraction:.6})");
+ assert.match(a.elements.get('qualityNotice').textContent,/هشدار/);
+ a.run("updateQualityNotice({reliable:true,fraction:0})");
+ assert.match(a.elements.get('qualityNotice').textContent,/پیش‌نمایش/);
+});
+
+test('Export includes the hairstyle even while viewing the before photo',()=>{
+ const a=app();a.scope.photo={width:1600,height:2400};a.scope.hair={kind:'hairstyle'};
+ a.run("selfie=photo;userImage={};referenceLayer=hair;showBefore=true;faceLayer=null;fitted={x:300,y:250,s:1,refEyeX:256,refEyeY:256,rotation:0};$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0");
+ const width=a.run("createExportCanvas().width");
+ assert.equal(width,1536);
+ assert.ok(a.draws.some(args=>args[0]===a.scope.hair));
+ assert.equal(a.run("showBefore"),true);
+});
+
+test('Smaller portrait export avoids unsupported fake 2x sharpness',()=>{
+ const a=app();a.scope.photo={width:720,height:1100};a.scope.hair={kind:'hairstyle'};
+ a.run("selfie=photo;userImage={};referenceLayer=hair;faceLayer=null;fitted={x:300,y:250,s:1,refEyeX:256,refEyeY:256,rotation:0};$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0");
+ assert.equal(a.run("createExportCanvas().width"),768);
+});
+
+test('Residual hair repair stays behind the chosen hairstyle and the original face',()=>{
+ const a=app();
+ a.scope.photo={kind:'customer'};a.scope.repair={kind:'repair'};a.scope.hair={kind:'hairstyle'};a.scope.face={kind:'face'};
+ a.run("userImage=photo;repairLayer=repair;referenceLayer=hair;faceLayer=face;fitted={x:300,y:250,s:1,refEyeX:200,refEyeY:150,rotation:0};$('repairHair').checked=true;$('protectFace').checked=true;$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;drawResult()");
+ const order=a.draws.map(x=>x[0]);
+ assert.equal(order.indexOf(a.scope.repair)>order.indexOf(a.scope.photo),true);
+ assert.equal(order.indexOf(a.scope.hair)>order.indexOf(a.scope.repair),true);
+ assert.equal(order.indexOf(a.scope.face)>order.indexOf(a.scope.hair),true);
+});
+test('User can turn residual hair repair off without disabling hairstyle preview',()=>{
+ const a=app();a.scope.photo={kind:'customer'};a.scope.repair={kind:'repair'};a.scope.hair={kind:'hairstyle'};
+ a.run("userImage=photo;repairLayer=repair;referenceLayer=hair;faceLayer=null;fitted={x:250,y:250,s:1,refEyeX:250,refEyeY:250,rotation:0};$('repairHair').checked=false;$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;drawResult()");
+ assert.equal(a.draws.some(x=>x[0]===a.scope.repair),false);
+ assert.equal(a.draws.some(x=>x[0]===a.scope.hair),true);
+});
+test('Dragging a style clears stale repair pixels before the next frame',()=>{
+ const a=app();const handlers={},canvas=a.elements.get('resultCanvas');
+ canvas.addEventListener=(key,fn)=>handlers[key]=fn;
+ canvas.setPointerCapture=()=>{};
+ canvas.getBoundingClientRect=()=>({width:768,height:960});
+ a.run("hasResult=true;userImage={};repairLayer={kind:'previousRepair'};referenceLayer={};faceLayer=null;fitted={x:250,y:250,s:1,refEyeX:250,refEyeY:250,rotation:0};$('scaleRange').value=100;$('xRange').value=0;$('yRange').value=0;$('rotRange').value=0;handleDrag()");
+ handlers.pointerdown({clientX:100,clientY:120,pointerId:1});
+ handlers.pointermove({clientX:102,clientY:122,pointerId:1});
+ assert.equal(a.run('repairLayer'),null);
+});
+
+test('Neural repair is composited between the real portrait and selected hairstyle',()=>{
+ const a=app();
+ a.scope.photo={kind:'customer'};a.scope.smart={kind:'neural'};a.scope.hair={kind:'hairstyle'};
+ a.run("userImage=photo;neuralLayer=smart;repairLayer={kind:'basic'};referenceLayer=hair;faceLayer=null;fitted={x:300,y:250,s:1,refEyeX:200,refEyeY:150,rotation:0};$('repairHair').checked=true;['scaleRange','xRange','yRange','rotRange'].forEach((id,i)=>$(id).value=i===0?100:0);drawResult()");
+ const order=a.draws.map(d=>d[0]);
+ assert.ok(order.indexOf(a.scope.smart)>order.indexOf(a.scope.photo));
+ assert.ok(order.indexOf(a.scope.hair)>order.indexOf(a.scope.smart));
+ assert.equal(order.some(d=>d.kind==='basic'),false);
+});
+test('Replacing the portrait invalidates neural results and prohibits stale export',async()=>{
+ const a=app();
+ a.run("neuralLayer={id:'oldClient'};hasResult=true;userImage={};$('saveBtn').disabled=false");
+ await a.run("uploadFile({type:'text/plain',name:'bad.txt',size:100})");
+ assert.equal(a.run('neuralLayer'),null);
+ assert.equal(a.elements.get('saveBtn').disabled,true);
+});
+test('Stylist controls invalidate neural reconstruction when head placement changes',()=>{
+ const a=app();
+ a.run("userImage={};selected={id:1};hasResult=true;neuralLayer={id:'old'};repairLayer=null;qualityCore=null;userMask={estimated:true};referenceMask={estimated:true};$('scaleRange').value=100;resetControls()");
+ assert.equal(a.run('neuralLayer'),null);
+});
+test('Neural readiness never enables inference with uncertain segmentation',()=>{
+ const a=app();
+ a.run("neuralInstalled=true;neuralVerified=true;hasResult=true;userMask={estimated:true};referenceMask={estimated:false};faceUser={eyeX:.5,eyeY:.4,eyeDistance:.2};updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,true);
+ a.run("userMask={estimated:false};updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,false);
+});
+
+test('Large customer-versus-reference pose differences disable neural restoration',()=>{
+ const a=app();
+ a.run("neuralInstalled=true;neuralBusy=false;hasResult=true;userImage={};userMask={mask:{},estimated:false};referenceMask={mask:{},estimated:false};faceUser={yaw:.58,eyeX:.4,eyeY:.35,eyeDistance:.22};faceRef={yaw:.03,eyeX:.5,eyeY:.35,eyeDistance:.22};qualityCore={poseCompatibility:(u,r)=>({mismatch:Math.abs(u.yaw-r.yaw)>=.34})};updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,true);
+ assert.match(a.run("updateQualityNotice({reliable:false});$('qualityNotice').textContent"),/زاویه/);
+});
+
+test('Neural cancellation kills the worker and clears pending private image jobs',()=>{
+ const a=app();a.scope.killed=0;a.scope.rejected=0;
+ a.run("neuralInstalled=true;neuralBusy=true;neuralLayer={old:true};neuralWorker={terminate:()=>killed++};neuralPending.set(3,{timeout:null,reject:()=>rejected++});cancelNeuralInference()");
+ assert.equal(a.scope.killed,1);
+ assert.equal(a.scope.rejected,1);
+ assert.equal(a.run('neuralBusy'),false);
+ assert.equal(a.run('neuralWorker'),null);
+ assert.equal(a.run('neuralLayer'),null);
+ assert.equal(a.run('neuralPending.size'),0);
+});
+test('Uploading an invalid replacement still terminates the previous neural inference',async()=>{
+ const a=app();a.scope.killed=0;
+ a.run("neuralBusy=true;neuralWorker={terminate:()=>killed++};neuralPending.set(1,{timeout:null,reject:()=>{}});hasResult=true");
+ await a.run("uploadFile({type:'text/plain',name:'invalid.txt',size:200})");
+ assert.equal(a.scope.killed,1);
+ assert.equal(a.run('neuralWorker'),null);
+ assert.equal(a.run('neuralLayer'),null);
+ assert.equal(a.run('hasResult'),false);
+});
+
+test('Neural inference stays disabled until real synthetic model verification passes',()=>{
+ const a=app();
+ a.run("neuralInstalled=true;neuralVerified=false;hasResult=true;userImage={};userMask={mask:{},estimated:false};referenceMask={mask:{},estimated:false};faceUser={yaw:.01,eyeX:.5,eyeY:.4,eyeDistance:.2};faceRef={yaw:.02};qualityCore={poseCompatibility:()=>({mismatch:false})};updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,true);
+ assert.equal(a.elements.get('neuralTest').disabled,false);
+ a.run("neuralVerified=true;updateNeuralButtons()");
+ assert.equal(a.elements.get('neuralRun').disabled,false);
+ assert.equal(a.elements.get('neuralTest').disabled,true);
+});
+test('Canceling an in-flight worker revokes its old neural verification',()=>{
+ const a=app();a.scope.killed=0;
+ a.run("neuralVerified=true;neuralWorker={terminate:()=>killed++};cancelNeuralInference()");
+ assert.equal(a.run('neuralVerified'),false);
+ assert.equal(a.scope.killed,1);
+});
+
+test('Unsupported Android Worker gracefully reports failure without breaking ordinary preview',async()=>{
+ const a=app();
+ a.run("neuralInstalled=true;hasResult=true;userImage={portrait:true};referenceLayer={};neuralVerified=false");
+ await a.run('testNeuralEngine()');
+ assert.equal(a.run('neuralBusy'),false);
+ assert.equal(a.run('neuralVerified'),false);
+ assert.match(a.elements.get('neuralStatus').textContent,/تست مدل موفق نبود/);
+ assert.equal(a.run('hasResult'),true);
+});
+
+test('Cancelled neural self-test cannot overwrite newer portrait state',async()=>{
+ const a=app();let resolve;
+ a.scope.pendingSelfTest=new Promise(r=>resolve=r);
+ a.run("neuralInstalled=true;hasResult=true;userImage={};getNeuralWorker=()=>({postMessage(){},terminate(){},addEventListener(){}});neuralPending.set=neuralPending.set.bind(neuralPending)");
+ // Simulate the stale success resolving after the phone has replaced the photo.
+ a.run("testNeuralEngine=async function(){const epoch=++neuralEpoch;neuralBusy=true;const data=await pendingSelfTest;if(epoch!==neuralEpoch)return;neuralVerified=data;neuralMessage('old result')}");
+ const first=a.run('testNeuralEngine()');
+ a.run("++neuralEpoch;neuralVerified=false;neuralBusy=false;neuralMessage('current state')");
+ resolve(true);await first;
+ assert.equal(a.run('neuralVerified'),false);
+ assert.equal(a.elements.get('neuralStatus').textContent,'current state');
+});
+test('Neural worker assembly uses one preallocated verified model buffer',()=>{
+ const code=fs.readFileSync(new URL('../public/ai/neural-inpaint-worker.mjs',import.meta.url),'utf8');
+ assert.match(code,/PART_SIZES=\[12582912,12582912,2913357\]/);
+ assert.match(code,/const binary=new Uint8Array\(size\)/);
+ assert.doesNotMatch(code,/parts\.push\(binary\)/);
+ assert.match(code,/binary\.set\(part,offset\)/);
 });

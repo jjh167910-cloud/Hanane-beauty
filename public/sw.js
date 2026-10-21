@@ -4,9 +4,10 @@
  * Every script pack contains pre-bundled images, so success means the complete
  * catalog can open without a network connection (until browser data is evicted).
  */
-const VERSION='hananeh-static-20261021-v9';
+const VERSION='hananeh-static-20261021-v13';
+const HQ_CACHE='hananeh-hq-inpaint-model-v1';
 const PACKS=Array.from({length:14},(_,i)=>'./data/pack-'+String(i+1).padStart(2,'0')+'.js');
-const CORE=['./','./index.html','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png',...PACKS];
+const CORE=['./','./index.html','./catalog.js','./manifest.webmanifest','./icons/app.svg','./icons/app-192.png','./icons/app-512.png','./ai/quality-core.mjs','./ai/residual-hair-repair.mjs','./ai/neural-inpaint-core.mjs','./ai/neural-inpaint-worker.mjs',...PACKS];
 // Optional AI assets: a missing model never prevents the offline catalog from installing.
 const AI_FILES=['./ai/hair-segmenter.mjs','./ai/mask-utils.mjs',
   './ai/vendor/vision_bundle.mjs','./ai/models/hair_segmenter.tflite',
@@ -20,6 +21,46 @@ async function cacheOptional(cache,path){
   if(!response.ok||response.redirected||(response.headers.get('content-type')||'').toLowerCase().includes('text/html'))return false;
   await cache.put(path,response);return true;
  }catch{return false;}
+}
+
+
+const HQ_FILES=[
+ './ai/inpaint/model-part-00.bin',
+ './ai/inpaint/model-part-01.bin',
+ './ai/inpaint/model-part-02.bin',
+ './ai/inpaint/runtime/ort.wasm.min.mjs',
+ './ai/inpaint/runtime/ort-wasm-simd-threaded.mjs',
+ './ai/inpaint/runtime/ort-wasm-simd-threaded.wasm'
+];
+let hqTask=null;
+async function auditHQ(client){
+ const cache=await caches.open(HQ_CACHE),missing=[];
+ for(const file of HQ_FILES)if(!(await cache.match(file)))missing.push(file);
+ await send(client,{type:'HQ_AUDIT',ready:missing.length===0,
+  done:HQ_FILES.length-missing.length,total:HQ_FILES.length,missing});
+}
+async function prepareHQ(client){
+ if(hqTask)return hqTask;
+ hqTask=(async()=>{
+  const cache=await caches.open(HQ_CACHE),failed=[];
+  let done=0;
+  for(const file of HQ_FILES){
+   try{
+    if(!(await cache.match(file))){
+     const response=await fetch(file,{cache:'reload'});
+     if(!response.ok||response.redirected||
+       (response.headers.get('content-type')||'').toLowerCase().includes('text/html'))
+       throw Error('Unsupported model asset response');
+     await cache.put(file,response);
+    }
+    done++;
+   }catch(error){failed.push(file);}
+   await send(client,{type:'HQ_PROGRESS',done,total:HQ_FILES.length,failed:failed.length});
+  }
+  await auditHQ(client);
+  await send(client,{type:'HQ_FINISHED',ready:failed.length===0,failed});
+ })().finally(()=>{hqTask=null;});
+ return hqTask;
 }
 
 // Browsers reject followed-redirect responses for some offline navigations.
@@ -74,6 +115,8 @@ self.addEventListener('message',event=>{
   const client=event.source;
   if(event.data?.type==='CACHE_STATUS')event.waitUntil(auditCache(client));
   if(event.data?.type==='CACHE_REPAIR')event.waitUntil(repairCache(client));
+  if(event.data?.type==='HQ_STATUS')event.waitUntil(auditHQ(client));
+  if(event.data?.type==='HQ_PREPARE')event.waitUntil(prepareHQ(client));
 });
 self.addEventListener('fetch',event=>{
   const req=event.request;
@@ -82,6 +125,17 @@ self.addEventListener('fetch',event=>{
     const cache=await caches.open(VERSION);
     const cached=await cache.match(req,{ignoreSearch:true});
     if(cached)return req.mode==='navigate'?navigationResponse(cached):cached;
+    // HQ inference binaries are cached separately, to persist across
+    // normal app-shell upgrades without automatically using extra storage.
+    const hq=await caches.open(HQ_CACHE);
+    const model=await hq.match(req,{ignoreSearch:true});
+    if(model)return model;
+    // Model weights and WASM runtimes must never be downloaded merely
+    // because a page/Worker requested their URL. Installation requires the
+    // explicit HQ_PREPARE action, keeping large bandwidth use opt-in.
+    const isOptionalNeuralAsset=HQ_FILES.some(file=>
+      new URL(file,self.location.origin+'/').pathname===new URL(req.url).pathname);
+    if(isOptionalNeuralAsset)return Response.error();
     try{
       const response=await fetch(req);
       if(response.ok)await cache.put(req,response.clone());

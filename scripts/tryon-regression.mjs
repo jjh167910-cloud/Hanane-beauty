@@ -52,3 +52,30 @@ test('Dismissing a style preview retains the previously chosen style',()=>{
   a.run("window.OFFLINE_IMAGES={'1':'x','2':'y'};catalog=[{id:1,name:'first',code:'A',variantIds:[1],variantNames:['first']},{id:2,name:'second',code:'B',variantIds:[2],variantNames:['second']}];selected=catalog[0];openStyle(2);closeSheet()");
   assert.equal(a.run('selected.id'),1);
 });
+
+test('Choosing a hairstyle opens portrait picker when no photo exists',()=>{
+  const a=app();let clicks=0;
+  a.elements.get('photoInput').click=()=>clicks++;
+  a.run("window.OFFLINE_IMAGES={'1':'x'};catalog=[{id:1,name:'first',code:'A',variantIds:[1],variantNames:['first']}];openStyle(1);chooseStyle()");
+  assert.equal(clicks,1);assert.equal(a.run('selected.id'),1);
+});
+
+test('Choosing a new hairstyle reuses portrait and automatically requests preview',()=>{
+  const a=app();a.scope.calls=[];
+  a.run("generate=()=>calls.push(selected.id);userImage={};window.OFFLINE_IMAGES={'1':'x','2':'y'};catalog=[{id:1,name:'first',code:'A',variantIds:[1],variantNames:['first']},{id:2,name:'second',code:'B',variantIds:[2],variantNames:['second']}];openStyle(1);chooseStyle();openStyle(2);chooseStyle()");
+  assert.deepEqual(a.scope.calls,[1,2]);
+});
+
+test('Portrait upload automatically previews the selected hairstyle',async()=>{
+  const a=app();a.scope.calls=[];a.scope.photo={width:800,height:1000};
+  a.run("loadImage=async()=>photo;selected={id:9};generate=()=>calls.push(selected.id)");
+  await a.run("uploadFile({type:'image/jpeg',size:2000})");
+  assert.deepEqual(a.scope.calls,[9]);assert.equal(a.run('loadingPhoto'),false);
+});
+
+test('Invalid portrait cannot generate a result with the previous photo',async()=>{
+  const a=app();a.scope.calls=[];
+  a.run("userImage={};selected={id:9};loadImage=async()=>{throw Error('Invalid image')};generate=()=>calls.push(selected.id)");
+  await a.run("uploadFile({type:'image/jpeg',size:2000})");
+  assert.deepEqual(a.scope.calls,[]);assert.equal(a.run('userImage'),null);
+});

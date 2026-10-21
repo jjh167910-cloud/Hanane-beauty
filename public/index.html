@@ -48,7 +48,7 @@ let refImage=null,userImage=null,referenceLayer=null,faceLayer=null,repairLayer=
 let inputRevision=0,uploadRevision=0;
 let browsingStyle=null,browsingVariant=0;
 let loadingPhoto=false,previewQueued=false;
-let neuralInstalled=false,neuralVerified=false,neuralBusy=false,neuralWorker=null,neuralRequest=0;
+let neuralInstalled=false,neuralVerified=false,neuralBusy=false,neuralWorker=null,neuralRequest=0,neuralEpoch=0;
 const neuralPending=new Map();
 function neuralMessage(message){$('neuralStatus').textContent=message;}
 function updateNeuralButtons(){
@@ -247,6 +247,8 @@ function updateQualityNotice(report){
  * styles. A terminated WASM worker cannot keep its decoded 28 MB model alive.
  */
 function cancelNeuralInference(){
+ // Invalidate all pending async continuations BEFORE rejecting them.
+ ++neuralEpoch;
  if(neuralWorker){try{neuralWorker.terminate();}catch(_){ }neuralWorker=null;}
  for(const job of neuralPending.values()){
   clearTimeout(job.timeout);
@@ -318,7 +320,7 @@ function getNeuralWorker(){
   for(const t of neuralPending.values()){
    clearTimeout(t.timeout);t.reject(Error('On-device AI worker failed'));
   }
-  neuralPending.clear();worker.terminate();neuralWorker=null;
+  ++neuralEpoch;neuralPending.clear();worker.terminate();neuralWorker=null;
   neuralVerified=false;neuralBusy=false;updateNeuralButtons();
  });
  neuralWorker=worker;return worker;
@@ -341,6 +343,7 @@ function requestNeuralInference(pixels,mask){
 }
 async function testNeuralEngine(){
  if(!neuralInstalled||neuralBusy||neuralVerified)return;
+ const epoch=++neuralEpoch;
  neuralBusy=true;updateNeuralButtons();
  neuralMessage('تست واقعی مدل روی پردازندهٔ گوشی، فقط با عکس ساختگی؛ بدون نیاز به عکس مشتری…');
  try{
@@ -356,16 +359,20 @@ async function testNeuralEngine(){
    try{worker.postMessage({type:'SELF_TEST',id});}
    catch(error){neuralPending.delete(id);clearTimeout(timeout);reject(error);}
   });
+  if(epoch!==neuralEpoch)return;
   neuralVerified=!!metrics?.modelVerified&&metrics.provider==='wasm';
   if(!neuralVerified)throw Error('مدل روی این گوشی به درستی اجرا نشد');
   neuralMessage('✓ مدل واقعی روی گوشی با موفقیت اجرا شد ('+metrics.durationMs+' میلی‌ثانیه)؛ آمادهٔ پردازش آفلاین عکس.');
  }catch(error){
-  neuralVerified=false;
-  neuralMessage('تست مدل موفق نبود؛ پیش‌نمایش معمولی همچنان کار می‌کند: '+String(error?.message||error));
- }finally{neuralBusy=false;updateNeuralButtons();}
+  if(epoch===neuralEpoch){
+   neuralVerified=false;
+   neuralMessage('تست مدل موفق نبود؛ پیش‌نمایش معمولی همچنان کار می‌کند: '+String(error?.message||error));
+  }
+ }finally{if(epoch===neuralEpoch){neuralBusy=false;updateNeuralButtons();}}
 }
 async function runNeuralHairRepair(){
  if(neuralBusy||!neuralInstalled||!neuralVerified||!hasResult||!userImage)return;
+ const epoch=++neuralEpoch;
  neuralBusy=true;updateNeuralButtons();
  const ticket=neuralTicket();
  try{
@@ -374,12 +381,12 @@ async function runNeuralHairRepair(){
   if(qualityCore.poseCompatibility(faceUser,faceRef).mismatch)
    throw Error('زاویهٔ چهره با مدل مرجع متفاوت است. لطفاً تصویر هم‌زاویه انتخاب کنید');
   const core=await import('./ai/neural-inpaint-core.mjs');
-  if(ticket!==neuralTicket())return;
+  if(epoch!==neuralEpoch||ticket!==neuralTicket())return;
   const stage=createNeuralStage(core);
   if(!stage?.eligible)throw Error('محدوده امن و کافی برای ترمیم عصبی تشخیص داده نشد: '+(stage?.reason||'no face'));
   neuralMessage('در حال بازسازی پس‌زمینه با مدل عصبی روی گوشی؛ لطفاً برنامه را باز نگه دارید…');
   const result=await requestNeuralInference(stage.pixels,stage.mask);
-  if(ticket!==neuralTicket())return;
+  if(epoch!==neuralEpoch||ticket!==neuralTicket())return;
   const rgba=core.neuralOutputToRGBA(result,stage.mask,512,512);
   const patch=document.createElement('canvas');patch.width=patch.height=512;
   const pc=patch.getContext('2d');
@@ -391,8 +398,9 @@ async function runNeuralHairRepair(){
   $('qualityNotice').textContent='بازسازی عصبی پس‌زمینه انجام شد. این خروجی همچنان مشاوره‌ای است؛ شکل و نور موهای جدید از تصویر مرجع گرفته می‌شود.';
   neuralMessage('✓ ترمیم عصبی کامل شد. عکس با مدل مو همچنان روی همین دستگاه است.');
  }catch(e){
-  neuralMessage('ترمیم عصبی برای این عکس مناسب نبود: '+String(e?.message||e));
- }finally{neuralBusy=false;updateNeuralButtons();}
+  if(epoch===neuralEpoch)
+   neuralMessage('ترمیم عصبی برای این عکس مناسب نبود: '+String(e?.message||e));
+ }finally{if(epoch===neuralEpoch){neuralBusy=false;updateNeuralButtons();}}
 }
 function drawResult(){
  drawUser();

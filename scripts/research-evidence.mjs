@@ -58,7 +58,8 @@ export function validateEvidence(report){
   if(photoPrior&&photoPrior!==r.split)fail('identical source image crosses dataset split');
   splitByImage.set(r.source_image_sha256,r.split);
   sources.add(r.source_subject_id);
-  referenceSubjects.add(r.reference_subject_id);
+  // Bald conversion has no reference hairstyle; do not count its sentinel as a person.
+  if(r.reference_subject_id!=='no-reference-hair-removal')referenceSubjects.add(r.reference_subject_id);
   statuses[r.status]=(statuses[r.status]||0)+1;caseCount++;
   let m=methods.get(r.method_id);if(!m){m={n:0,ok:0,failed:0,rejected:0,inference:[]};methods.set(r.method_id,m);}
   m.n++;m[r.status]++;

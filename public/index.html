@@ -12,6 +12,7 @@
  <b>ترمیم عصبی مو · آزمایشی</b>
  <p>هوش مصنوعی سبک برای بازسازی پس‌زمینهٔ پنهان زیر موهای قبلی؛ مدل موی جدید هنوز از بانک تصاویر انتخاب می‌شود. پردازش فقط روی گوشی انجام می‌شود.</p>
  <div class="control-actions"><button id="neuralInstall" class="secondary" type="button">ذخیره موتور عصبی برای آفلاین (حدود ۴۵ مگابایت)</button>
+ <button id="neuralTest" class="secondary" type="button" disabled>تست واقعی موتور روی گوشی</button>
  <button id="neuralRun" class="primary" type="button" disabled>ترمیم هوشمند موهای قبلی</button></div>
  <div id="neuralStatus" class="progress" role="status" aria-live="polite">برای استفاده بدون اینترنت، یک بار موتور را با اینترنت ذخیره کنید.</div>
 </div></div></section>
@@ -47,13 +48,14 @@ let refImage=null,userImage=null,referenceLayer=null,faceLayer=null,repairLayer=
 let inputRevision=0,uploadRevision=0;
 let browsingStyle=null,browsingVariant=0;
 let loadingPhoto=false,previewQueued=false;
-let neuralInstalled=false,neuralBusy=false,neuralWorker=null,neuralRequest=0;
+let neuralInstalled=false,neuralVerified=false,neuralBusy=false,neuralWorker=null,neuralRequest=0;
 const neuralPending=new Map();
 function neuralMessage(message){$('neuralStatus').textContent=message;}
 function updateNeuralButtons(){
  $('neuralInstall').disabled=neuralBusy||neuralInstalled;
+ $('neuralTest').disabled=neuralBusy||!neuralInstalled||neuralVerified;
  const mismatched=!!qualityCore?.poseCompatibility?.(faceUser,faceRef)?.mismatch;
- $('neuralRun').disabled=neuralBusy||!neuralInstalled||!hasResult||!faceUser||
+ $('neuralRun').disabled=neuralBusy||!neuralInstalled||!neuralVerified||!hasResult||!faceUser||
    !userMask||!referenceMask||userMask.estimated||referenceMask.estimated||mismatched;
 }
 function postHQ(type){
@@ -68,13 +70,13 @@ if(typeof navigator!=='undefined'&&'serviceWorker' in navigator){
  navigator.serviceWorker.addEventListener('message',e=>{
   const m=e.data||{};
   if(m.type==='HQ_AUDIT'){
-   neuralInstalled=!!m.ready;updateNeuralButtons();
+   neuralInstalled=!!m.ready;if(!neuralInstalled)neuralVerified=false;updateNeuralButtons();
    neuralMessage(neuralInstalled?'✓ موتور عصبی روی این دستگاه برای استفاده آفلاین ذخیره شده است.':
     'بسته عصبی ناقص است ('+m.done+' از '+m.total+' فایل).');
   }
   if(m.type==='HQ_PROGRESS')neuralMessage('ذخیرهٔ موتور روی گوشی: '+m.done+' از '+m.total+' فایل');
   if(m.type==='HQ_FINISHED'){
-   neuralInstalled=!!m.ready;neuralBusy=false;updateNeuralButtons();
+   neuralInstalled=!!m.ready;neuralVerified=false;neuralBusy=false;updateNeuralButtons();
    neuralMessage(m.ready?'✓ بسته عصبی آماده استفاده بدون اینترنت است.':
     'برخی فایل‌ها ذخیره نشدند؛ دوباره تلاش کنید.');
   }
@@ -251,7 +253,7 @@ function cancelNeuralInference(){
   job.reject(Error('Previous neural reconstruction cancelled'));
  }
  neuralPending.clear();
- neuralBusy=false;
+ neuralBusy=false;neuralVerified=false;
  neuralLayer=null;
  updateNeuralButtons();
 }
@@ -309,6 +311,7 @@ function getNeuralWorker(){
   if(!pending)return;
   neuralPending.delete(d.id);clearTimeout(pending.timeout);
   if(d.type==='RESULT')pending.resolve(new Uint8Array(d.image));
+  else if(d.type==='TEST_RESULT')pending.resolve(d.metrics);
   else pending.reject(Error(d.error||'Local neural inference failed'));
  });
  worker.addEventListener('error',event=>{
@@ -316,6 +319,7 @@ function getNeuralWorker(){
    clearTimeout(t.timeout);t.reject(Error('On-device AI worker failed'));
   }
   neuralPending.clear();worker.terminate();neuralWorker=null;
+  neuralVerified=false;neuralBusy=false;updateNeuralButtons();
  });
  neuralWorker=worker;return worker;
 }
@@ -335,8 +339,31 @@ function requestNeuralInference(pixels,mask){
   catch(error){neuralPending.delete(id);clearTimeout(timeout);reject(error);}
  });
 }
+async function testNeuralEngine(){
+ if(!neuralInstalled||neuralBusy||neuralVerified)return;
+ const worker=getNeuralWorker(),id=++neuralRequest;
+ neuralBusy=true;updateNeuralButtons();
+ neuralMessage('تست واقعی مدل روی پردازندهٔ گوشی، فقط با عکس ساختگی؛ بدون نیاز به عکس مشتری…');
+ try{
+  const metrics=await new Promise((resolve,reject)=>{
+   const timeout=setTimeout(()=>{
+    neuralPending.delete(id);worker.terminate();neuralWorker=null;
+    reject(Error('زمان تست موتور به پایان رسید یا حافظهٔ گوشی کافی نبود'));
+   },180000);
+   neuralPending.set(id,{resolve,reject,timeout});
+   try{worker.postMessage({type:'SELF_TEST',id});}
+   catch(error){neuralPending.delete(id);clearTimeout(timeout);reject(error);}
+  });
+  neuralVerified=!!metrics?.modelVerified&&metrics.provider==='wasm';
+  if(!neuralVerified)throw Error('مدل روی این گوشی به درستی اجرا نشد');
+  neuralMessage('✓ مدل واقعی روی گوشی با موفقیت اجرا شد ('+metrics.durationMs+' میلی‌ثانیه)؛ آمادهٔ پردازش آفلاین عکس.');
+ }catch(error){
+  neuralVerified=false;
+  neuralMessage('تست مدل موفق نبود؛ پیش‌نمایش معمولی همچنان کار می‌کند: '+String(error?.message||error));
+ }finally{neuralBusy=false;updateNeuralButtons();}
+}
 async function runNeuralHairRepair(){
- if(neuralBusy||!neuralInstalled||!hasResult||!userImage)return;
+ if(neuralBusy||!neuralInstalled||!neuralVerified||!hasResult||!userImage)return;
  neuralBusy=true;updateNeuralButtons();
  const ticket=neuralTicket();
  try{
@@ -530,6 +557,7 @@ $('neuralInstall').addEventListener('click',()=>{
  if(!navigator.onLine){neuralMessage('برای دریافت اولیه موتور هوش مصنوعی ابتدا به اینترنت متصل شوید.');return;}
  neuralBusy=true;updateNeuralButtons();neuralMessage('در حال دریافت بسته آفلاین...');postHQ('HQ_PREPARE');
 });
+$('neuralTest').addEventListener('click',()=>testNeuralEngine());
 $('neuralRun').addEventListener('click',()=>runNeuralHairRepair());
 if(typeof window.addEventListener==='function')window.addEventListener('pagehide',()=>{if(neuralBusy||neuralWorker)cancelNeuralInference();});
 $('resetBtn').addEventListener('click',resetControls);

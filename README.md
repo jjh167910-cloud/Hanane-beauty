@@ -78,3 +78,11 @@ The JPEG exporter is decoupled from the Before/After toggle and uses the decoded
 The pure quality functions live in `public/ai/quality-core.mjs` and are included in the offline service worker cache. Automated quality and export regressions are in `scripts/quality-regression.mjs` and `scripts/tryon-regression.mjs`.
 
 **Still not solved:** automatic removal of the customer's previous long hair, synthesis of newly exposed background/scalp, hair relighting/shadow simulation, 3D pose-dependent occlusion, or realistic new strands. Actual salon-quality transfer requires an independently evaluated generative/inpainting engine. A passing source test alone is not visual proof. Never upload portraits to an online engine without explicit opt-in consent.
+
+### Conservative offline removal of residual strands (quality prototype)
+
+The `residual-hair-repair.mjs` module detects hair that remains visible outside the projected replacement hairstyle, and attempts **limited background-color reconstruction** only where the original background is locally uniform. It accepts existing HairSegmenter confidence masks and the BlazeFace face guard. It rejects noisy/background-inconsistent areas, large residual hair regions, and components touching the protected face; it does not invent a scalp, ears, or complex background. The customer can turn off the feature using the `ترمیم محدود موهای باقی‌مانده` toggle. Repair patches are discarded while dragging or changing hairstyle controls, then recalculated after placement settles.
+
+The repaired pixels are an offline 384×480 transparent overlay, drawn between the original photograph and the hairstyle, and are included in the photo export. This can reduce distracting hair fragments against plain salon backgrounds but does **not** solve long-to-short conversions, hair geometry, specular lighting, or generative transfer. Every preview remains a consultation approximation.
+
+Run `npm test` on the branch to execute the catalog/offline/image/face and residual-hair regression suites; static and pure JavaScript checks were performed during development. Visual accuracy must still be assessed on real portraits before this feature is promoted from a draft pull request to production.

@@ -1,0 +1,32 @@
+MODNet PORTRAIT ALPHA — ATTRIBUTION AND USAGE LIMITS
+Research-only integration into Hananeh Beauty (2026-10-22).
+
+Original project: MODNet: Real-Time Trimap-Free Portrait Matting via
+Objective Decomposition.
+Authors: Zhanghan Ke, Jiayu Sun, Kaican Li, Qiong Yan, Rynson W. H. Lau.
+Proceedings of the AAAI Conference on Artificial Intelligence (2022).
+https://github.com/ZHKKKe/MODNet
+
+ONNX fp16 conversion: Xenova / Hugging Face
+https://huggingface.co/Xenova/modnet
+Pinned source revision:
+7e0f55f28727b43369531f75e0539ecc4912af82
+onnx/model_fp16.onnx
+SHA-256:
+25f165da9bfd30830a575f1f0490f1acd995975cb349bc02f3d79332e1fe5cf6
+
+The upstream MODNet repository states its source code and pretrained
+models are released under Apache License 2.0 (excluding its GIF assets).
+The Hugging Face conversion is labelled Apache-2.0.
+Full license text is provided with this site at:
+../ai/licenses/Apache-2.0.txt
+
+MODNet estimates the matte of the ENTIRE PERSON and is not trained
+specifically for separating hairs, predicting hair strands, generating
+new hairstyles, or reconstructing the hidden scalp.
+
+Commercial publication of the overall Hananeh Beauty hairstyle
+try-on remains blocked until independent evaluation and rights review
+confirm the quality and all component/photograph permissions. Apache
+license labels on this model do not license customer photographs or
+other unrelated weights.

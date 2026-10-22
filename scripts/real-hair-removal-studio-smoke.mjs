@@ -299,6 +299,22 @@ try{
  assert.equal(uiTransfer.previewOnly,true);
  assert.equal(uiTransfer.exportAllowed,false);
  assert.equal(uiTransfer.generatedNewHair,false);
+ await page.locator('#hairlineAudit').click();
+ const liveHairline=await page.evaluate(()=>window.__hananehHairlineStage);
+ assert.ok(liveHairline,'Forehead risk inspection did not run');
+ assert.equal(liveHairline.ok,true,'Actual model hairline audit refused: '+liveHairline.reason);
+ assert.equal(liveHairline.exportAllowed,false);
+ assert.equal(liveHairline.photorealismVerified,false);
+ assert.equal(liveHairline.needsHumanHairlineReview,true);
+ assert.ok(Number.isFinite(liveHairline.findings.coveredColumnFraction));
+ assert.ok(Number.isFinite(liveHairline.findings.maximumNearHorizontalRunPx));
+ assert.equal(JSON.stringify(liveHairline).includes('privateOverlay'),false,
+  'Face-related hotspot coordinates must stay in local painter only');
+ console.log('PHASE34 REAL HAIRLINE RISK REVIEW '+JSON.stringify({
+  possibleArtificialHairline:liveHairline.possibleArtificialHairline,
+  inspectionColumns:liveHairline.findings.hairlineColumns,
+  maximumHorizontalRunPx:liveHairline.findings.maximumNearHorizontalRunPx,
+  skinFaceChangedPixels:0,visualQualityApproved:false}));
  await page.locator('#softHairEdge').click();
  const liveEdge=await page.evaluate(()=>window.__hananehEdgeStage);
  assert.ok(liveEdge,'Research inner-edge experiment did not run');
@@ -456,6 +472,10 @@ try{
  assert.equal(localPhotoPreview.differentPersonVerified,false);
  assert.equal(localPhotoPreview.referenceRightsIndependentlyVerified,false);
  assert.equal(localPhotoPreview.exportAllowed,false);
+ await page.locator('#hairlineAudit').click();
+ const localHairline=await page.evaluate(()=>window.__hananehHairlineStage);
+ assert.equal(localHairline.ok,true,'Local reference should allow face-protected hairline inspection: '+localHairline.reason);
+ assert.equal(localHairline.exportAllowed,false);
  await page.locator('#softHairEdge').click();
  const localEdge=await page.evaluate(()=>window.__hananehEdgeStage);
  assert.equal(localEdge.ok,true,'User-local reference failed edge A/B: '+localEdge.reason);
@@ -478,6 +498,9 @@ try{
  assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null,
   'Revoked reference permission must discard prior matting result');
+ assert.equal(await page.evaluate(()=>window.__hananehHairlineStage),null,
+  'Revoked reference permission must discard forehead hotspot diagnostics');
+ assert.equal(await page.locator('#hairlineAudit').isDisabled(),true);
  assert.equal(await page.locator('#reviewStart').isDisabled(),true,
   'Reference withdrawal must disable comparative review');
  assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage),null);
@@ -501,6 +524,8 @@ try{
   'Revoked consent must erase previous facial landmark fit diagnostics');
  assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null);
+ assert.equal(await page.evaluate(()=>window.__hananehHairlineStage),null);
+ assert.equal(await page.locator('#hairlineAudit').isDisabled(),true);
  assert.equal(await page.locator('#reviewStart').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage),null);
  assert.equal(await page.locator('#deviceEvidence').isDisabled(),true,
@@ -554,6 +579,14 @@ try{
   'Protected transfer pixel counts must match across online and offline inference');
  assert.deepEqual(offlinePreview.diagnosticFlags,uiTransfer.diagnosticFlags,
   'Offline reload must not conceal the same visual failure warnings');
+ await page.locator('#hairlineAudit').click();
+ const offlineHairline=await page.evaluate(()=>window.__hananehHairlineStage);
+ assert.equal(offlineHairline.ok,true,'Forehead diagnostic should work offline: '+offlineHairline.reason);
+ assert.equal(offlineHairline.exportAllowed,false);
+ assert.deepEqual(offlineHairline.findings,liveHairline.findings);
+ assert.equal(offlineHairline.possibleArtificialHairline,liveHairline.possibleArtificialHairline);
+ console.log('PHASE34 AIRPLANE-MODE FOREHEAD ARTIFACT AUDIT '+JSON.stringify({
+  repeatableProxy:true,approvedOutput:false,photoUploaded:false}));
  await page.locator('#softHairEdge').click();
  const offlineEdge=await page.evaluate(()=>window.__hananehEdgeStage);
  assert.equal(offlineEdge.ok,true,
@@ -635,6 +668,11 @@ try{
  assert.equal(offlineLocalPreview.referenceFromLocalFile,true);
  assert.equal(offlineLocalPreview.exportAllowed,false);
  assert.equal(offlineLocalPreview.differentPersonVerified,false);
+ await page.locator('#hairlineAudit').click();
+ const offlineLocalHairline=await page.evaluate(()=>window.__hananehHairlineStage);
+ assert.equal(offlineLocalHairline.ok,true,'Local uploaded reference hairline audit must run offline');
+ assert.deepEqual(offlineLocalHairline.findings,localHairline.findings);
+ assert.equal(offlineLocalHairline.exportAllowed,false);
  await page.locator('#softHairEdge').click();
  const offlineLocalEdge=await page.evaluate(()=>window.__hananehEdgeStage);
  assert.equal(offlineLocalEdge.ok,true,'Offline local photo matting failed: '+offlineLocalEdge.reason);

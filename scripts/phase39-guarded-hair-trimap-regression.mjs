@@ -69,5 +69,5 @@ test('fail closed on model safety corruption, wrong input and invalid thresholds
  const q=fixture();
  assert.throws(()=>trimap({...q,radius:0}),/Invalid/);
  assert.throws(()=>trimap({...q,foregroundThreshold:65}),/Invalid/);
- assert.throws(()=>trimap({...q,width:6000}),/Invalid/);
+ assert.throws(()=>trimap({...q,width:9000,height:9000}),/Invalid/);
 });

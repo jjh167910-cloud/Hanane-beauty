@@ -139,3 +139,56 @@ It remains a research preview, not a customer deliverable.
 
 **Do not claim any new real-image coverage or seam result for this
 revised mode until GitHub workflow verifies the exact guarded commit.**
+
+
+## VERIFIED guarded real-image comparison — final engineering A/B
+
+**Successful complete CI on the actual guarded revision**
+`4f5c066a86934c6cf67c8a24252e1620a7b28d81`:
+https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39803317454
+
+A genuine local 512×512 MediaPipe/MIGAN Chromium sample measured:
+
+| Same image / same donor hair mask | Previous stronger 0.52 | Guarded 0.20 |
+|---|---:|---:|
+| Mean boundary RGB jump | 28.89227 | **46.68156** |
+| Boundary jump reduction relative to unsoftened 64.08555 | 54.9% | **27.2%** |
+| Donor alpha mass retained | 96.965% | **98.838%** |
+| Coverage retained on previously erased original hair | 98.512% | **99.431%** |
+| Previously well-covered erased-hair pixels falling below threshold | 248 | **0** |
+| Pixels changing in the A/B preview | 2,311 | **2,291** |
+| Local RGB neighbour gradient ratio | 1.27065 | **1.12597** |
+| Independent hair-quality or hairline verification | None | **None** |
+| Automatically permitted customer export | No | **No** |
+
+The guarded candidate passes all declared *pixel-level* risk checks
+(`proxyCheckPassed:true, warnings:[]`). Identical metrics were
+recorded with the browser network disabled; core mask and all existing
+face-protection tests passed. The tests do not establish that the
+feathered hairline looks realistic. They show the more aggressive
+blend's measured scalp-exposure defect was eliminated on this
+ONE catalog pair, with an intentionally smaller reduction in seam
+contrast.
+
+The actual six-class segmentation remains a model prediction and the
+catalog photo is not a different-person quality benchmark. External
+human-blinded evaluation and physical Android performance remain
+unverified. There is no change to the production app.
+
+## Specialized 2026 generator research update
+
+`HairPort` (SIGGRAPH 2026) directly addresses pose-aware hairstyle
+transfer by constructing 3D-aligned hair views before final
+generation:
+https://github.com/deepmancer/HairPort
+
+Its official README specifies >=24 GB GPU VRAM recommended, FLUX-based
+and other model dependencies, required canonical 3D meshes, and a
+**CC BY-NC-ND 4.0** repository license. Those facts make it a useful
+scientific *reference architecture* but not a free-to-commercialize,
+fully offline Android-Chrome model. Do not integrate weights or derive
+a commercial student without independently secured permissions.
+
+**Current status: the guarded 2D blend passes measured engineering
+invariants but the requested photorealistic hairstyle generator
+remains unresolved.**

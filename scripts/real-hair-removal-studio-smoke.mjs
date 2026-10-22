@@ -78,6 +78,24 @@ try{
  assert.equal(result.outsideMaskChangedPixels,0,'Real browser must preserve every non-removal pixel');
  assert.ok(result.changedChannels>1000);
  assert.equal(await page.locator('#portraitMatte').isEnabled(),true);
+ assert.equal(await page.locator('#hairTrimap').isEnabled(),true);
+ await page.locator('#hairTrimap').click();
+ const firstTrimap=await page.evaluate(()=>window.__hananehHairTrimapStage);
+ assert.equal(firstTrimap.ok,true,'Hair trimap construction failed: '+firstTrimap.reason);
+ assert.equal(firstTrimap.estimatedHairAlpha,false);
+ assert.equal(firstTrimap.neuralHairMattingExecuted,false);
+ assert.equal(firstTrimap.exportAllowed,false);
+ assert.equal(firstTrimap.protectedForeheadPreserved,true);
+ assert.ok(firstTrimap.metrics.foreground>30);
+ assert.ok(firstTrimap.metrics.unknown>30);
+ assert.ok(firstTrimap.metrics.background>200);
+ assert.ok(firstTrimap.metrics.originalPredictedHairProtectedConflicts>=0);
+ console.log('PHASE39 REAL GUARDED HAIR TRIMAP '+JSON.stringify({
+  knownHair:firstTrimap.metrics.foreground,
+  unknown:firstTrimap.metrics.unknown,
+  knownBackground:firstTrimap.metrics.background,
+  predictedHairFaceConflicts:firstTrimap.metrics.originalPredictedHairProtectedConflicts,
+  alphaNotPredicted:true,commercialApproval:false}));
  await page.locator('#portraitMatte').click();
  await page.waitForFunction(()=>window.__hananehPortraitMatteStage!==null,{timeout:160000});
  const livePortraitMatte=await page.evaluate(()=>window.__hananehPortraitMatteStage);
@@ -597,6 +615,8 @@ try{
  assert.equal(await page.locator('#referenceDecontam').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehPortraitMatteStage),null);
  assert.equal(await page.locator('#portraitMatte').isDisabled(),true);
+ assert.equal(await page.evaluate(()=>window.__hananehHairTrimapStage),null);
+ assert.equal(await page.locator('#hairTrimap').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehMicrotextureStage),null,
   'Revoked reference permission must erase all donor texture diagnostics');
  assert.equal(await page.locator('#hairTexture').isDisabled(),true);
@@ -654,6 +674,7 @@ try{
     '/ai/migan/models/portrait-modnet-manifest.json',
     '/ai/migan/models/portrait-modnet-fp16.onnx',
     '/ai/migan/portrait-modnet-neural-audit.mjs',
+    '/ai/migan/guarded-hair-trimap.mjs',
     ...manifest.parts.map(p=>'/ai/migan/parts/'+p.name)];
    return {files:files.length,present:await Promise.all(files.map(async p=>!!(await cache.match(p))))};
  });
@@ -671,6 +692,15 @@ try{
  result=await page.evaluate(()=>window.__hananehHairStage);
  assert.ok(!result.error,'Offline repeat: '+result.error);
  assert.equal(result.realInpainting,true);assert.equal(result.realSegmentation,true);
+ await page.locator('#hairTrimap').click();
+ const offlineTrimap=await page.evaluate(()=>window.__hananehHairTrimapStage);
+ assert.equal(offlineTrimap.ok,true,'Face-safe hair trimap must run airplane mode: '+offlineTrimap.reason);
+ assert.deepEqual(offlineTrimap.metrics,firstTrimap.metrics);
+ assert.equal(offlineTrimap.estimatedHairAlpha,false);
+ assert.equal(offlineTrimap.exportAllowed,false);
+ console.log('PHASE39 AIRPLANE MODE HAIR TRIMAP '+JSON.stringify({
+  identicalCounts:true,faceVetoRetained:true,
+  hairNeuralAlphaPredicted:false,customerExport:false}));
  await page.locator('#portraitMatte').click();
  await page.waitForFunction(()=>window.__hananehPortraitMatteStage!==null,{timeout:160000});
  const offlinePortraitMatte=await page.evaluate(()=>window.__hananehPortraitMatteStage);

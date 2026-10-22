@@ -138,7 +138,9 @@ async function analyze(){
    predictedFaceSkinFraction:veto.semanticFaceFraction,
    pretrainedSemanticModel:'MediaPipe SelfieMulticlass Apache-2.0',
    independentAnatomicalGroundTruth:false,remoteRequests:0},null,2);
- }catch(error){proposal=null;status(String(error.message||error),true);}
+ }catch(error){
+  if(key===token){proposal=null;status(String(error.message||error),true);}
+ }
  finally{if(key===token)$('analyze').disabled=false;}
 }
 $('analyze').addEventListener('click',analyze);
@@ -211,7 +213,12 @@ async function inpaint(){
     model:'MI-GAN 512',privacy:'no customer image uploaded'};
   $('metrics').textContent=JSON.stringify(proof,null,2);
   window.__hananehHairStage=proof;
- }catch(e){status('مدل آفلاین اجرا نشد: '+e.message,true);window.__hananehHairStage={error:String(e)};}
+ }catch(e){
+  if(key===token){
+   status('مدل آفلاین اجرا نشد: '+e.message,true);
+   window.__hananehHairStage={error:String(e)};
+  }
+ }
  finally{if(key===token)$('run').disabled=!(proposal&&$('approve').checked);}
 }
 $('run').addEventListener('click',inpaint);

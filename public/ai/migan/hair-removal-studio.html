@@ -634,6 +634,11 @@ $('hairTexture').addEventListener('click',()=>{
  }
  window.__hananehMicrotextureStage=report;
  $('hairTextureMetrics').textContent=JSON.stringify(report,null,2);
+ // This additional research ablation must not cancel the pre-existing
+ // rigid-vs-guarded randomized A/B capability. A freshly started review
+ // never inherits old votes, photos or preselected method labels.
+ $('reviewStart').disabled=!(window.__hananehEdgeStage?.ok&&
+   window.__hananehTransferStage?.ok&&$('approve').checked);
  $('hairTexture').disabled=!(window.__hananehEdgeStage?.ok&&$('approve').checked);
 });
 const randomHex=bytes=>{

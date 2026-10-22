@@ -339,6 +339,28 @@ try{
   'Method-labelled earlier panels must not remain visible during blinded evaluation');
  assert.equal(await page.locator('#reviewSourcePortrait').isVisible(),true);
  assert.equal(await page.locator('#reviewReferencePortrait').isVisible(),true);
+ assert.equal(await page.locator('#reviewZoomA').isVisible(),true,
+  'Same-crop forehead close-up should be shown during focused review');
+ assert.equal(await page.locator('#reviewZoomB').isVisible(),true);
+ const zoomProof=await page.evaluate(()=>{
+  const a=document.querySelector('#reviewZoomA');
+  const b=document.querySelector('#reviewZoomB');
+  const ref=document.querySelector('#reviewCanvasA');
+  const aa=a.getContext('2d').getImageData(0,0,a.width,a.height).data;
+  const bb=b.getContext('2d').getImageData(0,0,b.width,b.height).data;
+  let nonBlankA=0,nonBlankB=0;
+  for(let i=0;i<aa.length;i+=4){
+   if(aa[i+3]===255)nonBlankA++;
+   if(bb[i+3]===255)nonBlankB++;
+  }
+  return {available:window.__hananehBlindReviewStage?.hairlineZoomAvailable,
+   nonBlankA,nonBlankB,fullWidth:ref.width,zoomWidth:a.width};
+ });
+ assert.equal(zoomProof.available,true);
+ assert.ok(zoomProof.nonBlankA>1000);
+ assert.ok(zoomProof.nonBlankB>1000);
+ assert.equal(zoomProof.fullWidth,512);
+ assert.equal(zoomProof.zoomWidth,512);
  assert.equal(await page.locator('#reviewExit').isEnabled(),true);
  assert.equal(await page.locator('#reviewExport').isDisabled(),true);
  assert.equal(await page.locator('#reviewQuestions fieldset').count(),4);
@@ -374,6 +396,10 @@ try{
    'No portraits, filenames or device identifiers in vote metadata: '+forbidden);
  }
  assert.equal(await page.locator('#reviewExport').isDisabled(),true);
+ console.log('PHASE35 SAME-ROI BLIND HAIRLINE CLOSEUP PASSED '+JSON.stringify({
+  matchingSourceFrame:true,bothSidesRendered:true,
+  methodLabelsHidden:true,photoExportAllowed:false,
+  realHumanVotes:0}));
  console.log('PHASE33 SYNTHETIC BLIND UI INTEGRATION '+JSON.stringify({
   candidateSideMaskedDuringRating:true,questions:4,
   recordedVotes:'automated abstentions only',humanVotesVerified:false,
@@ -382,6 +408,8 @@ try{
  assert.equal(await page.evaluate(()=>document.body.classList.contains('review-focus')),false,
   'Leaving a review destroys the focus mode and its images');
  assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage),null);
+ assert.equal(await page.locator('#reviewZoomA').isVisible(),false,
+  'Consent or user discard must hide enlarged facial close-up');
  assert.equal(await page.locator('#reviewExport').isDisabled(),true);
  assert.equal(await page.locator('#reviewStart').isEnabled(),true);
  console.log('PHASE31 REAL HAIR CUTOUT INNER-EDGE ABLATION '+JSON.stringify({
@@ -599,6 +627,8 @@ try{
  assert.equal(await page.evaluate(()=>document.body.classList.contains('review-focus')),true);
  assert.equal(await page.locator('#transferPortrait').isVisible(),false);
  assert.equal(await page.locator('#reviewSourcePortrait').isVisible(),true);
+ assert.equal(await page.locator('#reviewZoomA').isVisible(),true);
+ assert.equal(await page.locator('#reviewZoomB').isVisible(),true);
  assert.equal(await page.locator('#reviewQuestions fieldset').count(),4,
   'Blind review controls must function after airplane-mode reload');
  assert.equal(await page.locator('#reviewExport').isDisabled(),true,

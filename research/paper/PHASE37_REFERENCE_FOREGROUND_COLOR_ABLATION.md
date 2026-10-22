@@ -119,3 +119,46 @@ available, this work is **implemented but not integration
 certified**. Append actual measured candidate/change counts and
 a link to a real verified passing run, without inferring
 beauty-quality improvement from the RGB/color proxies.
+
+
+## Independently executable actual browser result — verified
+
+**PASS:** GitHub Actions run
+https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39815999720
+on commit `257ef3a33f8fb9e69729958bc67cf913a803a8ec`.
+The job completed successfully, including all unit tests, genuine local
+MediaPipe masks, MI-GAN 512×512 hair-removal inference, integrated
+reference-guided transfer and a full network-disabled browser repeat.
+
+Browser-local catalog fixture metrics:
+- Original reference confidence-transition candidates: **619**
+- Reference pixels whose existing RGB channels were conservatively
+  corrected: **382**
+- Composited preview pixels that differed from the original reference
+  transfer: **272**
+- Inferred true alpha ground truth: **none**
+- Newly generated hair support: **zero**
+- Protected face pixels edited by the corrected compositor: **zero**
+- Human visual quality independently confirmed: **false**
+- Commercial/customer export authorization: **false**
+
+Offline test run reproduced the SAME 382 reference and 272 final
+preview changed-pixel counts; no external portrait uploads were
+observed by the browser network assertions. A locally selected reference
+image was separately tested with a consent checkbox and permission
+withdrawal. The pixel checks ensure identical hair opacity, unmodified
+RGB outside the approved donor support and byte-identical source alpha.
+
+**Interpretation:** Only approximately 0.10% of final 512×512 portrait
+pixels changed (272/262144), and no separately acquired human-quality
+reference data exist to evaluate whether the difference is beneficial.
+The forehead artificial 53-pixel hairline from Phase 35 was NOT
+resolved or physically reconstructed in this experiment. A real
+portrait-level background-spill metric cannot be inferred solely from
+the self-referential inverse-compositing calculation. Image plausibility
+remains an external human judgment.
+
+**Decision: engineering experiment PASS; commercial hairstyle try-on
+NO-GO.** The next scientifically meaningful effort is a
+rights-cleared actual alpha-matting/hair synthesis model with physical
+Android testing, not unbounded RGB corrections.

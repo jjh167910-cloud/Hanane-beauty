@@ -122,7 +122,6 @@ export function auditHairAlphaRGBStability({
   }
  }
  if(kept+withdrawn!==newlyAccepted)return fail('New-hypothesis accounting mismatch');
- const baselineAccepted=unknown?unknown-baseline.metrics?.unresolvedUnknownPixels:0;
  // Never trust an optional summary object to count original anchors.
  let trueBaselineAccepted=0;
  for(let i=0;i<n;i++)if(t[i]===128&&baseline.valid[i]===1)trueBaselineAccepted++;
@@ -130,6 +129,7 @@ export function auditHairAlphaRGBStability({
   ok:true,width,height,alpha:resultAlpha,valid:resultValid,diagnosticRGBA,
   method:'two-sided-local-RGB-stress-test-of-frozen-new-alpha-hypotheses',
   previewOnly:true,exportAllowed:false,commercialReleaseAllowed:false,
+  alphaGroundTruth:false,neuralHairMattingExecuted:false,
   hairAlphaGroundTruthVerified:false,photorealismVerified:false,
   independentlyValidatedHairAlpha:false,actualNewHairGenerated:false,
   metrics:{

@@ -67,13 +67,36 @@ as a salon sales promise. The purpose is to obtain an immediately
 testable local two-image workflow on a physical Android device,
 where a user can assess real cross-person failures and device runtime.
 
-## Verification status
+## Verified real browser evidence
 
-Unit and full browser tests are required in
-`.github/workflows/offline-ai-research-verify.yml`.
-Report specific successful GitHub run IDs only after its actual
-status and relevant browser logs have been checked. Do not infer
-a passing run from an earlier Phase 29 commit.
+**CI run** https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39795977799
+on commit `b3763be666be0bda672111a824a1201676161065`;
+overall GitHub Actions run reports completed/success. The full job log
+contains successful `npm run test:unit`, real MediaPipe / MI-GAN
+inference, online local-file processing and airplane-mode processing.
+
+Observed and reproducible facts:
+- Real uploaded local WebP reference from already bundled catalog `3`.
+- Refused without a separate reference permission check.
+- Original source hairstyle catalog item qualified and inpainted.
+- Rigid local-reference two-photo composition succeeded.
+- Six-landmark method **refused** this particular new reference,
+  rather than using unbounded deformation. The rigid preview remained
+  available. This is a genuine geometry LIMIT, not evidence of improved
+  reference transfer.
+- The browser test reported `differentPersonVerified=false`,
+  `referenceRightsIndependentlyVerified=false`,
+  `commercialReleaseAllowed=false`.
+- The exact count of transferred hair pixels was stable when the
+  reference file was reselected after a full network-disabled reload.
+- Withdrawal erased the local file-picker selection and prior preview.
+- No external requests were observed by the browser network-intercept
+  safety check.
+
+The CI fixtures reuse the same catalog image bank; **no true different-
+person generalization test has been demonstrated**. No visual
+human quality ratings were collected, and none may be inferred.
+
 
 ## Next engineering decision
 

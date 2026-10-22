@@ -299,6 +299,14 @@ try{
  assert.equal(uiTransfer.previewOnly,true);
  assert.equal(uiTransfer.exportAllowed,false);
  assert.equal(uiTransfer.generatedNewHair,false);
+ await page.locator('#targetAware').click();
+ await page.waitForFunction(()=>!!window.__hananehTargetAwareStage,{timeout:180000});
+ const liveTarget=await page.evaluate(()=>window.__hananehTargetAwareStage);
+ assert.equal(liveTarget.ok,true,'Real second MI-GAN comparison failed: '+liveTarget.reason);
+ assert.ok(liveTarget.unnecessaryErasureAvoided>0);
+ assert.equal(liveTarget.exportAllowed,false);
+ assert.equal(liveTarget.oldRemovalPixels,
+  liveTarget.targetRemovalPixels+liveTarget.unnecessaryErasureAvoided);
  assert.equal(await page.locator('#download').isEnabled(),true,
   'The separate research inpainting export may remain enabled only while consent is active');
  if(previewStudy.renderedComparison){
@@ -360,6 +368,15 @@ try{
   'Protected transfer pixel counts must match across online and offline inference');
  assert.deepEqual(offlinePreview.diagnosticFlags,uiTransfer.diagnosticFlags,
   'Offline reload must not conceal the same visual failure warnings');
+ await page.locator('#targetAware').click();
+ await page.waitForFunction(()=>!!window.__hananehTargetAwareStage,{timeout:180000});
+ const offlineTarget=await page.evaluate(()=>window.__hananehTargetAwareStage);
+ assert.equal(offlineTarget.ok,true,
+  'Airplane-mode target-aware actual second MI-GAN inference failed: '+offlineTarget.reason);
+ assert.equal(offlineTarget.oldRemovalPixels,liveTarget.oldRemovalPixels);
+ assert.equal(offlineTarget.targetRemovalPixels,liveTarget.targetRemovalPixels);
+ assert.equal(offlineTarget.unnecessaryErasureAvoided,liveTarget.unnecessaryErasureAvoided);
+ assert.equal(offlineTarget.exportAllowed,false);
 
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
  console.log('AIRPLANE MODE FULL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({inferenceMs:result.inferenceMs,cacheFiles:stored.files,referenceHairstyleTransfer:result.generatedHair}));

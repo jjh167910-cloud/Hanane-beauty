@@ -41,6 +41,7 @@ import {getLocalHairSegmenter} from '../hair-segmenter.mjs';
 import {getLocalMulticlassSegmenter} from '../offhair-multiclass-baseline.mjs';
 import {createSemanticSkinVeto} from './semantic-skin-veto.mjs';
 import {composeReferenceHairResearch} from './reference-transfer-research.mjs';
+import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
 import {prepareHairRemoval,composeInpaintedRGBA} from './hair-removal-core.mjs';
 const S=512,N=S*S,$=id=>document.getElementById(id);
 let imageData=null,proposal=null,token=0,transferToken=0,sessionPromise=null,reviewSource=null;
@@ -140,8 +141,10 @@ async function analyze(){
   const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(analysis.mask,0,0,S,S);
   const veto=createSemanticSkinVeto(semantic.labels,semantic.width,semantic.height,S,S);
   if(!veto.ok)throw Error('محافظت از پوست قابل اطمینان نیست: '+veto.reason);
+  const landmarks=makeLandmarkFaceZones(analysis.face,S,S);
+  if(!landmarks.ok)throw Error('حفاظت از ویژگی‌های صورت قابل اعتماد نیست: '+landmarks.reason);
   const result=prepareHairRemoval(ctx.getImageData(0,0,S,S).data,S,S,
-   analysis.face,{semanticVeto:veto});
+   analysis.face,{semanticVeto:veto,faceZones:landmarks.zones});
   if(!result.ok)throw Error('پردازش ایمن نیست: '+result.reason);
   proposal=result;
   reviewSource={face:analysis.face,
@@ -154,6 +157,7 @@ async function analyze(){
   $('approve').disabled=false;status('ماسک پیشنهاد شد. پیش از ادامه قسمت قرمز و حفاظت از صورت را بررسی کنید.');
   $('metrics').textContent=JSON.stringify({hairPixels:result.hairPixels,coveragePercent:+(result.areaFraction*100).toFixed(2),protectedPixels:result.protectedPixels,faceAnchored:true,
    semanticGuardApplied:result.semanticGuardApplied,
+   faceLandmarkGuardApplied:result.faceLandmarkGuardApplied,
    semanticConflicts:result.semanticConflicts,
    predictedFaceSkinFraction:veto.semanticFaceFraction,
    pretrainedSemanticModel:'MediaPipe SelfieMulticlass Apache-2.0',
@@ -228,6 +232,7 @@ async function inpaint(){
     inferenceMs:Math.round(performance.now()-t),totalMs:Math.round(performance.now()-start),
     faceOutsideMaskPreserved:true,crossOriginIsolated:self.crossOriginIsolated,
     semanticGuardApplied:proposal.semanticGuardApplied,
+    faceLandmarkGuardApplied:proposal.faceLandmarkGuardApplied,
     semanticConflicts:proposal.semanticConflicts,
     predictedFaceSkinFraction:proposal.semanticFaceFraction,
     model:'MI-GAN 512',privacy:'no customer image uploaded'};

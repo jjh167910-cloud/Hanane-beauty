@@ -69,6 +69,10 @@ try{
  assert.equal(result.realSegmentation,true);
  assert.equal(result.realInpainting,true);
  assert.equal(result.generatedHair,false);
+ assert.equal(result.semanticGuardApplied,true,'Real pretrained semantic protection must execute');
+ assert.ok(Number.isFinite(result.predictedFaceSkinFraction)&&result.predictedFaceSkinFraction>0,
+  'Real face-skin prediction must be measured');
+ assert.ok(result.semanticConflicts>=0,'Skin guard disagreement count must be recorded');
  assert.equal(result.faceOutsideMaskPreserved,true);
  assert.equal(result.outsideMaskChangedPixels,0,'Real browser must preserve every non-removal pixel');
  assert.ok(result.changedChannels>1000);
@@ -117,6 +121,8 @@ try{
  result=await page.evaluate(()=>window.__hananehHairStage);
  assert.ok(!result.error,'Offline repeat: '+result.error);
  assert.equal(result.realInpainting,true);assert.equal(result.realSegmentation,true);
+ assert.equal(result.semanticGuardApplied,true,'Airplane mode must retain the real semantic veto');
+ assert.ok(Number.isFinite(result.predictedFaceSkinFraction));
  assert.equal(result.outsideMaskChangedPixels,0,'Airplane-mode reconstruction must not alter protected pixels');
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
  console.log('AIRPLANE MODE FULL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({inferenceMs:result.inferenceMs,cacheFiles:stored.files,referenceHairstyleTransfer:result.generatedHair}));

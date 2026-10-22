@@ -108,7 +108,9 @@ $('sample').addEventListener('change',async e=>{
 });
 async function analyze(){
  if(!imageData)return;
- const key=token;$('analyze').disabled=true;dropResult();status('مدل تشخیص موی کاملاً محلی در حال اجرا است...');
+ // A second analysis on the same photo is still a new operation. Cancel any
+ // running inpainting before replacing masks or user approval.
+ const key=++token;$('analyze').disabled=true;dropResult();status('مدل تشخیص موی کاملاً محلی در حال اجرا است...');
  try{
   const [engine,semanticEngine]=await Promise.all([
    getLocalHairSegmenter(),getLocalMulticlassSegmenter()]);
@@ -140,7 +142,14 @@ async function analyze(){
  finally{if(key===token)$('analyze').disabled=false;}
 }
 $('analyze').addEventListener('click',analyze);
-$('approve').addEventListener('change',()=>{$('run').disabled=!(proposal&&$('approve').checked);});
+$('approve').addEventListener('change',()=>{
+ if(!$('approve').checked){
+  // Withdrawal invalidates both current export and any in-flight neural output.
+  token++;$('download').disabled=true;window.__hananehHairStage=null;
+  clearCanvas(afterCanvas);
+ }
+ $('run').disabled=!(proposal&&$('approve').checked);
+});
 async function bytes(){
  const info=await (await fetch('./model-manifest.json')).json(),buf=new Uint8Array(info.size);let p=0;
  for(const part of info.parts){
@@ -175,9 +184,11 @@ async function inpaint(){
   const feed={image:new ort.Tensor('uint8',rgb,[1,3,S,S]),
               mask:new ort.Tensor('uint8',proposal.keepMask,[1,1,S,S])};
   const t=performance.now(),pred=await session.run(feed);if(key!==token)return;
+  if(!$('approve').checked||!proposal)return;
   const output=pred[session.outputNames[0]];
   if(output.type!=='uint8'||output.dims.join(',')!=='1,3,512,512')throw Error('Unexpected neural tensor');
   const composite=composeInpaintedRGBA(imageData.data,output.data,proposal.keepMask,S,S);
+  if(key!==token||!$('approve').checked)return;
   let outsideMaskChangedPixels=0;
   for(let i=0;i<N;i++){
    if(proposal.keepMask[i]===0)continue;

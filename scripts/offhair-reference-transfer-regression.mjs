@@ -113,3 +113,40 @@ test('additional face-zone protection makes a removal mask a strict subset',()=>
  assert.equal(prepareHairRemoval(a,W,H,face,
   {semanticVeto:p.semanticVeto,faceZones:untrusted}).ok,false);
 });
+
+
+test('optional six-anchor donor warp preserves immutable source skin and keeps commercial export blocked',()=>{
+ const p=setup();
+ p.referenceFace={...face,noseX:.503,mouthX:.501,earPoints:[
+  {x:.275,y:.506},{x:.729,y:.514}]};
+ const rigid=composeReferenceHairResearch(p);
+ const adjusted=composeReferenceHairResearch({...p,alignmentMode:'bounded-landmark'});
+ assert.equal(rigid.ok,true,rigid.reason);
+ assert.equal(adjusted.ok,true,adjusted.reason);
+ assert.equal(adjusted.measures.alignmentMode,'bounded-landmark');
+ assert.ok(adjusted.measures.landmarkAlignment.anchorCount===6);
+ assert.ok(adjusted.measures.landmarkAlignment.postFitMeanPx<=
+  adjusted.measures.landmarkAlignment.preFitMeanPx+.05);
+ assert.equal(adjusted.exportAllowed,false);
+ assert.equal(adjusted.referenceHairstyleGenerated,false);
+ let changed=0;
+ for(let i=0;i<N;i++){
+  const k=4*i;
+  if(p.semanticVeto.guard[i])assert.equal(adjusted.opacity[i],0,
+   'No hair texture may cover independently predicted face skin');
+  if(p.keepMask[i]===255&&adjusted.opacity[i]===0)
+   for(let c=0;c<4;c++)assert.equal(adjusted.rgba[k+c],p.sourceRGBA[k+c]);
+  for(let c=0;c<3;c++)if(adjusted.rgba[k+c]!==rigid.rgba[k+c])changed++;
+ }
+ assert.ok(changed>0,'A geometrically distinct reference should exercise local deformation');
+ assert.ok(adjusted.diagnosticFlags.includes('bounded_2d_landmark_warp_no_3d_geometry'));
+});
+test('unreliable source and donor landmark geometry must refuse nonrigid preview',()=>{
+ const p=setup();p.referenceFace={...face,earPoints:null};
+ const result=composeReferenceHairResearch({...p,alignmentMode:'bounded-landmark'});
+ assert.equal(result.ok,false);
+ assert.match(result.reason,/Landmark-based donor alignment rejected/);
+ assert.equal(result.exportAllowed,false);
+ assert.throws(()=>composeReferenceHairResearch({...p,alignmentMode:'invented-neural-model'}),
+  /research alignment settings/);
+});

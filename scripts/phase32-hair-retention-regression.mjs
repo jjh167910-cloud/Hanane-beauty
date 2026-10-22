@@ -15,7 +15,9 @@ const make=()=>{
  }
  for(let y=10;y<40;y++)for(let x=17;x<60;x++){
   const i=y*W+x;old[i]=255;next[i]=254;
-  a.set([47,50,38,255],4*i);b.set([47,50,38,255],4*i);
+  const strand=(x%6===0?12:0);
+  a.set([47+strand,50+strand,38+strand,255],4*i);
+  b.set([47+strand,50+strand,38+strand,255],4*i);
   if(y===10||x===17||x===59||y===39){
    next[i]=237;b.set([55,57,46,255],4*i);
   }

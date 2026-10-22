@@ -89,3 +89,38 @@ a physical Android PWA. Research-only image models—including DreamLite
 without a separate commercial license—are not production candidates.
 Only after actual pretrained inference, independent hairstyle quality
 and phone measurements exist can a production GO decision be made.
+
+
+## Verified actual browser result (2026-10-22)
+
+A real GitHub Actions Linux Chromium run exercised the complete
+MediaPipe hair-and-face models, semantic skin veto, MI-GAN reconstruction
+and opt-in six-anchor reference cutout alignment.
+
+- Full commit tested: `a17c49472ded9ce4d9b1f71108f46b307a0da278`
+- Browser CI run: https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39793408359
+- Six anchors were available for the actual bundled catalog test pair.
+- Mean anchor residual **3.3404 px (rigid)** → **2.6735 px (nonrigid)**
+  at 512×512, a **~19.96% reduction in the *anchor error* metric**.
+- Maximum pre-fit residual: **7.9296 px**;
+  post-fit maximum: **5.4473 px**.
+- **16,714** result pixels differed between the warped and rigid previews.
+  This number does not establish any improvement in perceived realism.
+- `referenceHairstyleGenerated=false`, `exportAllowed=false`,
+  `realisticHairTransferVerified=false`.
+- The same six-point fit acceptance was confirmed after a full PWA
+  offline reload; no external portrait inference was required.
+
+Important limitations: Only one automatically selected bundled source/
+reference pair was measured. The catalog identity may be shared across
+the portraits, so this **is not cross-person quality evidence**.
+The genuine browser pipeline still reports
+`fringe_occlusion_unresolved` and
+`predicted_skin_occlusion_unresolved`.
+A deformation that reduces nose/ear landmark distance can still distort
+individual curls or make hairline transitions less attractive.
+No human blinded preference data, smartphone GPU/thermal measurements
+or end-customer quality approval have been collected.
+
+**Result: engineering alignment experiment PASS; customer photo
+realism and commercial release NO-GO.**

@@ -75,3 +75,43 @@ async function initialize(){
   close(){segmenter.close();}
  };
 }
+
+/**
+ * Conservative two-model semantic disagreement map for ANNOTATOR REVIEW only.
+ * Labels: 0 neither-hair/background; 1 hair consensus; 2 old hair only;
+ *         3 new model hair only; 4 old hair versus predicted face skin;
+ *         5 predicted face skin without old hair.
+ * This is NOT ground truth, a photo editor, a learned fusion network, or
+ * permission to synthesize new hair. Reject automatic editing unconditionally.
+ */
+export function reviewMulticlassHairConsensus(multiclassLabels,multiWidth,multiHeight,
+ hairRGBA,hairWidth,hairHeight,threshold=178){
+ // Strict validation shared with the quantification function.
+ const compared=compareHairModelMasks(multiclassLabels,multiWidth,multiHeight,
+  hairRGBA,hairWidth,hairHeight,threshold);
+ const classification=new Uint8Array(multiWidth*multiHeight),
+  counts={background:0,consensusHair:0,originalOnlyHair:0,multiclassOnlyHair:0,
+   originalHairVsFaceSkin:0,faceSkin:0};
+ for(let y=0;y<multiHeight;y++)for(let x=0;x<multiWidth;x++){
+  const i=y*multiWidth+x;
+  const xx=Math.min(hairWidth-1,Math.floor((x+.5)*hairWidth/multiWidth));
+  const yy=Math.min(hairHeight-1,Math.floor((y+.5)*hairHeight/multiHeight));
+  const a=hairRGBA[(yy*hairWidth+xx)*4]>=threshold;
+  const b=multiclassLabels[i]===MEDIA_PIPE_MULTICLASS.hair;
+  const skin=multiclassLabels[i]===MEDIA_PIPE_MULTICLASS.faceSkin;
+  let v=0;
+  if(skin)v=a?4:5;
+  else if(a&&b)v=1;
+  else if(a)v=2;
+  else if(b)v=3;
+  classification[i]=v;
+  const k=['background','consensusHair','originalOnlyHair','multiclassOnlyHair',
+    'originalHairVsFaceSkin','faceSkin'][v];
+  counts[k]++;
+ }
+ return {labels:classification,width:multiWidth,height:multiHeight,counts,
+  ...compared,needsHumanReview:counts.originalOnlyHair+counts.multiclassOnlyHair+
+   counts.originalHairVsFaceSkin>0,
+  editingAllowed:false,geometryValidated:false,
+  policy:'model disagreement triage only; human ground truth and facial topology absent'};
+}

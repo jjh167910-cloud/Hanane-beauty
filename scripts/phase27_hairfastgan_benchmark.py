@@ -115,6 +115,10 @@ def parse_manifest(path, data_root):
             assets[key] = file
         if assets["source_image"] == assets["shape_image"]:
             raise GateError(f"{cid}: cannot transfer style from the identical source")
+        if assets["shape_image"] != assets["color_image"]:
+            # A third person/color reference needs its OWN consent and rights
+            # records. This first frozen protocol only clears one reference.
+            raise GateError(f"{cid}: hair shape and color must use the SAME consented reference")
         validated.append((cid, assets))
     return validated
 

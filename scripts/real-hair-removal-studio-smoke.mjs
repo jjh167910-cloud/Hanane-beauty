@@ -254,6 +254,21 @@ try{
  assert.equal(result.faceLandmarkGuardApplied,true,'Airplane mode must retain facial feature protection');
  assert.ok(Number.isFinite(result.predictedFaceSkinFraction));
  assert.equal(result.outsideMaskChangedPixels,0,'Airplane-mode reconstruction must not alter protected pixels');
+ // Full reference hairstyle overlay is independently repeated with the browser
+ // network disabled, including real face/skin model inference and provenance.
+ await page.locator('#referenceSample').selectOption(eligible.id);
+ await page.locator('#previewTransfer').click();
+ await page.waitForFunction(()=>window.__hananehTransferStage!==null,{timeout:60000});
+ const offlinePreview=await page.evaluate(()=>window.__hananehTransferStage);
+ assert.equal(offlinePreview.ok,true,
+  'Offline end-to-end reference research preview failed: '+offlinePreview.reason);
+ assert.equal(offlinePreview.exportAllowed,false);
+ assert.equal(offlinePreview.generatedNewHair,false);
+ assert.deepEqual(offlinePreview.counts,uiTransfer.counts,
+  'Protected transfer pixel counts must match across online and offline inference');
+ assert.deepEqual(offlinePreview.diagnosticFlags,uiTransfer.diagnosticFlags,
+  'Offline reload must not conceal the same visual failure warnings');
+
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
  console.log('AIRPLANE MODE FULL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({inferenceMs:result.inferenceMs,cacheFiles:stored.files,referenceHairstyleTransfer:result.generatedHair}));
  // Study existing bundled salon portraits without uploading them. Fail-closed rejects

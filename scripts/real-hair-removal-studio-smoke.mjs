@@ -314,6 +314,52 @@ try{
  assert.equal(liveEdge.retentionRisk?.exportAllowed,false);
  assert.equal(liveEdge.retentionRisk?.humanHairQualityVerified,false);
  console.log('PHASE32 REAL HAIR RETENTION SAFETY CHECK '+JSON.stringify(liveEdge.retentionRisk));
+ // Phase33: browser automation supplies synthetic abstentions for integration
+ // only, NEVER actual or independently collected human visual ratings.
+ assert.equal(await page.locator('#reviewStart').isEnabled(),true);
+ await page.locator('#reviewStart').click();
+ assert.equal(await page.locator('#reviewExport').isDisabled(),true);
+ assert.equal(await page.locator('#reviewQuestions fieldset').count(),4);
+ assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage?.answeredCount),0);
+ for(const question of ['overall','scalp_realism','identity','hairstyle_fidelity']){
+  await page.locator('button[data-question="'+question+'"][data-vote="cannot_judge"]').click();
+ }
+ assert.equal(await page.locator('#reviewExport').isEnabled(),true);
+ const [blindDownload]=await Promise.all([
+  page.waitForEvent('download'),
+  page.locator('#reviewExport').click()
+ ]);
+ assert.equal(blindDownload.suggestedFilename(),'hananeh-blind-comparison-anonymous.json');
+ const recordedVotes=JSON.parse(await fs.readFile(await blindDownload.path(),'utf8'));
+ assert.equal(recordedVotes.includes_images,false);
+ assert.equal(recordedVotes.image_fingerprints_not_exported,true);
+ assert.equal(recordedVotes.source_reference_tokens_are_random_not_photo_hashes,true);
+ assert.equal(recordedVotes.human_preferences_verified,false);
+ assert.equal(recordedVotes.independent_participants_verified,false);
+ assert.equal(recordedVotes.is_publication_ready,false);
+ assert.equal(recordedVotes.commercial_release_approved,false);
+ assert.equal(recordedVotes.ratings.length,4);
+ assert.deepEqual(new Set(recordedVotes.ratings.map(x=>x.question)),
+  new Set(['overall','scalp_realism','identity','hairstyle_fidelity']));
+ assert.equal(recordedVotes.ratings.every(x=>x.vote==='cannot_judge'),true,
+  'Automation must use abstention only: it cannot fabricate human preferences');
+ assert.ok(['A','B'].includes(recordedVotes.ratings[0].candidate_side));
+ assert.equal(new Set(recordedVotes.ratings.map(x=>x.candidate_side)).size,1);
+ for(const forbidden of ['data:image','base64,','PRIVATE_PORTRAIT',
+   'photographic_sha256','userAgent','filename','local-photo','phone_model',
+   'hairstyle-generated.png']){
+  assert.equal(JSON.stringify(recordedVotes).includes(forbidden),false,
+   'No portraits, filenames or device identifiers in vote metadata: '+forbidden);
+ }
+ assert.equal(await page.locator('#reviewExport').isDisabled(),true);
+ console.log('PHASE33 SYNTHETIC BLIND UI INTEGRATION '+JSON.stringify({
+  candidateSideMaskedDuringRating:true,questions:4,
+  recordedVotes:'automated abstentions only',humanVotesVerified:false,
+  portraitExported:false,commercialApproval:false}));
+ await page.locator('#reviewDiscard').click();
+ assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage),null);
+ assert.equal(await page.locator('#reviewExport').isDisabled(),true);
+ assert.equal(await page.locator('#reviewStart').isEnabled(),true);
  console.log('PHASE31 REAL HAIR CUTOUT INNER-EDGE ABLATION '+JSON.stringify({
   changedPixels:liveEdge.changedPixels,
   softenedPixels:liveEdge.counts.softenedPixels,
@@ -424,6 +470,9 @@ try{
  assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null,
   'Revoked reference permission must discard prior matting result');
+ assert.equal(await page.locator('#reviewStart').isDisabled(),true,
+  'Reference withdrawal must disable comparative review');
+ assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage),null);
  await page.locator('#referenceSample').selectOption(eligible.id);
  await page.locator('#previewTransfer').click();
  await page.waitForFunction(()=>window.__hananehTransferStage!==null,{timeout:60000});
@@ -444,6 +493,8 @@ try{
   'Revoked consent must erase previous facial landmark fit diagnostics');
  assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null);
+ assert.equal(await page.locator('#reviewStart').isDisabled(),true);
+ assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage),null);
  assert.equal(await page.locator('#deviceEvidence').isDisabled(),true,
   'Revoked approval must disable performance evidence download');
  await page.locator('#approve').check();
@@ -503,6 +554,15 @@ try{
  assert.deepEqual(offlineEdge.boundaryProxy,liveEdge.boundaryProxy);
  assert.deepEqual(offlineEdge.retentionRisk,liveEdge.retentionRisk,
   'Full airplane mode should reproduce coverage erosion and scalp-exposure warnings');
+ await page.locator('#reviewStart').click();
+ assert.equal(await page.locator('#reviewQuestions fieldset').count(),4,
+  'Blind review controls must function after airplane-mode reload');
+ assert.equal(await page.locator('#reviewExport').isDisabled(),true,
+  'No offline votes can be exported before a human completes the review');
+ await page.locator('#reviewDiscard').click();
+ assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage),null);
+ console.log('PHASE33 OFFLINE REVIEW CONTROL PASSED '+JSON.stringify({
+  questions:4,autoHumanRatings:0,portraitUpload:false}));
  assert.equal(offlineEdge.exportAllowed,false);
  console.log('PHASE32 AIRPLANE-MODE HAIR COVERAGE AUDIT '+JSON.stringify({
   identicalRiskMetrics:true,proxyCheckPassed:offlineEdge.retentionRisk.proxyCheckPassed,

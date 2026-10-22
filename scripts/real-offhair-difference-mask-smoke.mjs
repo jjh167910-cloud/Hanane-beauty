@@ -43,6 +43,7 @@ try{
  const measure=async()=>{
   const {getLocalHairSegmenter}=await import('/ai/hair-segmenter.mjs');
   const {getLocalMulticlassSegmenter,compareHairModelMasks,reviewMulticlassHairConsensus}=await import('/ai/offhair-multiclass-baseline.mjs');
+  const {prioritizeModelDisagreements}=await import('/ai/offhair-review-regions.mjs');
   const {differenceMaskStudy,mapTopologyToRGBA}=await import('/ai/offhair-difference-masks.mjs');
   const {observationFromFaceAnchor,transferSupportMask,gateTargetSupport}=await import('/ai/offhair-pose-flow.mjs');
   const {makeLandmarkFaceZones}=await import('/ai/offhair-face-zones.mjs');
@@ -75,9 +76,24 @@ try{
      observations[id].mask,dim,dim);
     const review=reviewMulticlassHairConsensus(
      semantics.labels,semantics.width,semantics.height,observations[id].mask,dim,dim);
+    const triage=prioritizeModelDisagreements(review.labels,review.width,review.height,{
+     connectivity:8,minPixels:8,maxRegions:20});
     observations[id].semantic.review={
      ...review.counts,editingAllowed:review.editingAllowed,
-     needsHumanReview:review.needsHumanReview,geometryValidated:review.geometryValidated};
+     needsHumanReview:review.needsHumanReview,geometryValidated:review.geometryValidated,
+     triage:{reviewRegionCount:triage.reviewRegionCount,
+      shortlistedRegionCount:triage.shortlistedRegionCount,
+      totalReviewPixels:triage.totalReviewPixels,
+      reviewedPixels:triage.reviewedPixels,
+      omittedPixels:triage.omittedPixels,
+      omittedRegions:triage.omittedRegions,
+      omittedFaceSkinConflictPixels:triage.omittedFaceSkinConflictPixels,
+      omittedFaceSkinConflictRegions:triage.omittedFaceSkinConflictRegions,
+      priorityRegions:triage.regions.slice(0,4).map(r=>({
+       pixels:r.pixels,faceSkinConflictPixels:r.faceSkinConflictPixels,
+       box:[r.minX,r.minY,r.maxX,r.maxY]})),
+      editingAllowed:triage.editingAllowed,
+      groundTruthAvailable:triage.groundTruthAvailable}};
    }
   }
   // Measure sensitivity on every available independently segmented source photo.
@@ -201,6 +217,14 @@ try{
   assert.equal(m.crossModel?.hasIndependentGroundTruth,false);
   assert.equal(m.review?.editingAllowed,false);
   assert.equal(m.review?.geometryValidated,false);
+  const triage=m.review?.triage;
+  assert.ok(triage&&triage.reviewRegionCount>=triage.shortlistedRegionCount);
+  assert.equal(triage.editingAllowed,false);
+  assert.equal(triage.groundTruthAvailable,false);
+  assert.equal(triage.totalReviewPixels,triage.reviewedPixels+triage.omittedPixels);
+  assert.equal(triage.totalReviewPixels,
+   m.review.originalOnlyHair+m.review.multiclassOnlyHair+
+   m.review.originalHairVsFaceSkin);
   assert.equal(m.review?.background+m.review?.consensusHair+
    m.review?.originalOnlyHair+m.review?.multiclassOnlyHair+
    m.review?.originalHairVsFaceSkin+m.review?.faceSkin,

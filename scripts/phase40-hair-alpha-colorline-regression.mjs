@@ -78,5 +78,5 @@ test('wrong dimensions, transparency, invalid trimap or veto refuse',()=>{
  p=fixture();p.trimap.trimap=new Uint8Array(1);
  assert.equal(infer(p).ok,false);
  p=fixture();assert.throws(()=>infer({...p,radius:100}),/Invalid/);
- assert.throws(()=>infer({...p,width:1024,height:1024}),/Invalid/);
+ assert.throws(()=>infer({...p,width:2048,height:2048}),/Invalid/);
 });

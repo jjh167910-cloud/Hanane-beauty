@@ -100,3 +100,39 @@ Only mark inference PASS after a complete successful GitHub Actions
 run on the exact Phase 38 commit, with a genuine local MODNet
 model and an offline repeat. A synthetic tensor/unit test is not
 sufficient.
+
+## Real on-device-browser execution evidence (GitHub Linux Chromium)
+
+The first completed **integrated browser verification steps** on
+commit `35e3edaa15e0022bdefc2cd8c515400c741bf7ba` recorded:
+
+- Actual 12,984,781-byte MODNet ONNX weights downloaded and hashed to
+  `25f165da9bfd30830a575f1f0490f1acd995975cb349bc02f3d79332e1fe5cf6`.
+- Real neural ONNX WebAssembly inference: **1,102 ms** measured by
+  `performance.now()` from session creation through output;
+  this is a Linux GitHub runner result, **NOT an Android phone** benchmark.
+- Existing MediaPipe hair support on the test image:
+  **16,907** hair pixels.
+- Those hair pixels also predicted inside the MODNet person matte:
+  **0.9998817058023304** (~99.988%). This high overlap is expected
+  when a person matte covers the hair and head; it is **NOT a
+  benchmark of hairline transparency quality**.
+- No portrait image upload and no facial edit from the alpha diagnostic.
+- The full source inference and MODNet pipeline was repeated with
+  Chromium networking disabled: numeric matte statistics identical.
+- Browser-specific required steps including model verification and
+  integrated offline tests all reported success. This parent workflow
+  run was subsequently **cancelled** by a newer documentation commit.
+  DO NOT report the cancelled overall run as a full green run.
+- Precise model provenance and Apache-2 attribution were subsequently
+  added in `public/ai/licenses/MODNET_PORTRAIT_NOTICE.txt`,
+  and the research studio caches that notice offline.
+
+Once the latest exact branch commit has a completed successful CI run,
+that run is the authoritative final Phase 38 verification; it is
+separate from the superseded run above.
+
+**Model feasibility: evidence of real offline browser portrait matting.
+Hair-specific alpha, realistic hairline reconstruction, generative
+hairstyle quality, Android handset performance and commercial salon
+readiness: remain NOT VERIFIED.**

@@ -77,6 +77,27 @@ try{
  assert.equal(result.faceOutsideMaskPreserved,true);
  assert.equal(result.outsideMaskChangedPixels,0,'Real browser must preserve every non-removal pixel');
  assert.ok(result.changedChannels>1000);
+ assert.equal(await page.locator('#portraitMatte').isEnabled(),true);
+ await page.locator('#portraitMatte').click();
+ await page.waitForFunction(()=>window.__hananehPortraitMatteStage!==null,{timeout:160000});
+ const livePortraitMatte=await page.evaluate(()=>window.__hananehPortraitMatteStage);
+ assert.equal(livePortraitMatte.ok,true,
+  'Actual neural MODNet model did not run: '+livePortraitMatte.reason);
+ assert.equal(livePortraitMatte.realPortraitModelRan,true);
+ assert.equal(livePortraitMatte.hairAlphaGroundTruth,false);
+ assert.equal(livePortraitMatte.alphaIsGroundTruth,false);
+ assert.equal(livePortraitMatte.modelIsHairSpecific,false);
+ assert.equal(livePortraitMatte.exportAllowed,false);
+ assert.equal(livePortraitMatte.photoUploaded,false);
+ assert.equal(livePortraitMatte.facePixelsEdited,0);
+ assert.ok(livePortraitMatte.metrics.sourceHairPixels>1000);
+ assert.ok(livePortraitMatte.metrics.meanPortraitAlpha>=0&&
+  livePortraitMatte.metrics.meanPortraitAlpha<=1);
+ console.log('PHASE38 GENUINE PORTRAIT MATTING MODEL RUN '+JSON.stringify({
+  modelExecuted:true,inferenceMs:livePortraitMatte.elapsedMs,
+  hairPixels:livePortraitMatte.metrics.sourceHairPixels,
+  hairPersonAgreement:livePortraitMatte.metrics.hairInsidePredictedPersonFraction,
+  hasHairAlphaGroundTruth:false,faceEdits:0,commercialExport:false}));
  const comparison=await page.evaluate(()=>{
   const a=document.querySelector('#portrait').getContext('2d').getImageData(0,0,512,512).data;
   const b=document.querySelector('#after').getContext('2d').getImageData(0,0,512,512).data;
@@ -574,6 +595,8 @@ try{
   'Revoked reference permission must discard prior matting result');
  assert.equal(await page.evaluate(()=>window.__hananehDecontamStage),null);
  assert.equal(await page.locator('#referenceDecontam').isDisabled(),true);
+ assert.equal(await page.evaluate(()=>window.__hananehPortraitMatteStage),null);
+ assert.equal(await page.locator('#portraitMatte').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehMicrotextureStage),null,
   'Revoked reference permission must erase all donor texture diagnostics');
  assert.equal(await page.locator('#hairTexture').isDisabled(),true);
@@ -627,7 +650,11 @@ try{
    const manifest=await (await cache.match('/ai/migan/model-manifest.json')).json();
    const files=['/ai/migan/hair-removal-studio.html','/ai/migan/hair-removal-core.mjs',
     '/ai/hair-segmenter.mjs','/ai/models/hair_segmenter.tflite',
-    '/ai/migan/ort/ort.min.js',...manifest.parts.map(p=>'/ai/migan/parts/'+p.name)];
+    '/ai/migan/ort/ort.min.js',
+    '/ai/migan/models/portrait-modnet-manifest.json',
+    '/ai/migan/models/portrait-modnet-fp16.onnx',
+    '/ai/migan/portrait-modnet-neural-audit.mjs',
+    ...manifest.parts.map(p=>'/ai/migan/parts/'+p.name)];
    return {files:files.length,present:await Promise.all(files.map(async p=>!!(await cache.match(p))))};
  });
  assert.ok(stored.present.every(Boolean),'Offline model cache incomplete');
@@ -644,6 +671,19 @@ try{
  result=await page.evaluate(()=>window.__hananehHairStage);
  assert.ok(!result.error,'Offline repeat: '+result.error);
  assert.equal(result.realInpainting,true);assert.equal(result.realSegmentation,true);
+ await page.locator('#portraitMatte').click();
+ await page.waitForFunction(()=>window.__hananehPortraitMatteStage!==null,{timeout:160000});
+ const offlinePortraitMatte=await page.evaluate(()=>window.__hananehPortraitMatteStage);
+ assert.equal(offlinePortraitMatte.ok,true,
+  'Local real portrait matte must execute in airplane mode: '+offlinePortraitMatte.reason);
+ assert.deepEqual(offlinePortraitMatte.metrics,livePortraitMatte.metrics,
+  'Pinned local model must produce deterministic portrait alpha statistics');
+ assert.equal(offlinePortraitMatte.hairAlphaGroundTruth,false);
+ assert.equal(offlinePortraitMatte.exportAllowed,false);
+ console.log('PHASE38 PORTRAIT MATTING AIRPLANE MODE '+JSON.stringify({
+  sourceHairAgreementStable:true,
+  portraitAlphaIsHairMatte:false,portraitUpload:false,
+  independentHairQualityVerified:false}));
  assert.equal(result.semanticGuardApplied,true,'Airplane mode must retain the real semantic veto');
  assert.equal(result.faceLandmarkGuardApplied,true,'Airplane mode must retain facial feature protection');
  assert.ok(Number.isFinite(result.predictedFaceSkinFraction));

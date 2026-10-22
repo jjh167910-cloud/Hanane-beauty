@@ -112,7 +112,10 @@ export function auditHairEdgeRetention({
  if(erasedRetention!==null&&erasedRetention<minErasedHairOpacityRetention)
   warnings.push('newly_reconstructed_scalp_visibility_risk');
  if(criticalExposures>0)warnings.push('newly_low_coverage_over_erased_source_hair');
- if(!texturePairs)warnings.push('missing_hair_texture_support');
+ if(!texturePairs||textureBefore/Math.max(1,texturePairs)<.25)
+  warnings.push('no_measurable_donor_strand_detail');
+ else if(textureAfter/textureBefore<.85)
+  warnings.push('loss_of_local_hair_texture_gradient_proxy');
  const proxyCheckPassed=warnings.length===0;
  return {
   ok:true,reason:'Bounded donor-layer opacity risk audit, NOT appearance verification',

@@ -5,7 +5,7 @@ export function prepareHairRemoval(maskRGBA, width, height, face, opts={}){
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<32||height<32||
    width*height>1024*1024||maskRGBA?.length!==width*height*4)
    throw new TypeError('Invalid hair mask');
- const {threshold=178,minFraction=.006,maxFraction=.30,margin=2,semanticVeto=null}=opts;
+ const {threshold=178,minFraction=.006,maxFraction=.30,margin=2,semanticVeto=null,faceZones=null}=opts;
  if(![threshold,minFraction,maxFraction,margin].every(Number.isFinite) ||
    threshold<1||threshold>255||minFraction<=0||maxFraction>=.8||maxFraction<=minFraction||
    !Number.isInteger(margin)||margin<0||margin>8)
@@ -16,6 +16,11 @@ export function prepareHairRemoval(maskRGBA, width, height, face, opts={}){
   return {ok:false,reason:'Face landmarks unavailable or unreliable',hairPixels:0,areaFraction:0,protectedPixels:0};
  }
  const n=width*height,primary=new Uint8Array(n),keep=new Uint8Array(n);
+ if(faceZones!==null &&
+  (!(faceZones instanceof Uint8Array)||faceZones.length!==n||
+   faceZones.some(z=>z>2)))
+  return {ok:false,reason:'Face landmark protection unavailable or invalid',
+   hairPixels:0,areaFraction:0,protectedPixels:0};
  // Research-only optional SECOND veto. Absent means the original baseline;
  // malformed or unreliable supplied semantic analysis never silently falls back.
  if(semanticVeto!==null &&
@@ -32,7 +37,7 @@ export function prepareHairRemoval(maskRGBA, width, height, face, opts={}){
  const ry=face.eyeDistance*height*2.05;
  const isProtected=(x,y)=>{
   const a=(x-cx)/rx,b=(y-cy)/ry;
-  return a*a+b*b<=1;
+  return a*a+b*b<=1 || (faceZones!==null&&faceZones[y*width+x]===1);
  };
  let possible=0,protectedPixels=0,semanticConflicts=0;
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
@@ -67,6 +72,7 @@ export function prepareHairRemoval(maskRGBA, width, height, face, opts={}){
   return {ok:false,reason:'Unsafe expanded hair area',hairPixels:removed,areaFraction:removed/n,protectedPixels};
  return {ok:true,reason:'research-only removal mask',keepMask:keep,
    hairPixels:removed,areaFraction:removed/n,protectedPixels,eyeX:face.eyeX,eyeY:face.eyeY,
+   faceLandmarkGuardApplied:faceZones!==null,
    semanticGuardApplied:semanticVeto!==null,semanticConflicts,
    semanticFaceFraction:semanticVeto?.semanticFaceFraction??null};
 }

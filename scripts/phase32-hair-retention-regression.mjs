@@ -44,6 +44,28 @@ test('small guarded donor reduction passes proxy audit without pretending real q
  assert.ok(r.metrics.gradientEnergyRatio>0);
  const again=audit(p);assert.deepEqual(r,again,'Repeatable pure local proxy audit');
 });
+test('flat donor or lost detail never obtains a passing proxy score',()=>{
+ const p=make();
+ for(let y=10;y<40;y++)for(let x=17;x<60;x++){
+  const i=y*W+x;
+  p.baseline.rgba.set([40,40,40,255],4*i);
+  p.variant.rgba.set([40,40,40,255],4*i);
+ }
+ let r=audit(p);
+ assert.equal(r.ok,true);
+ assert.equal(r.proxyCheckPassed,false);
+ assert.ok(r.warnings.includes('no_measurable_donor_strand_detail'));
+ const q=make();
+ for(let y=10;y<40;y++)for(let x=17;x<60;x++){
+  const i=y*W+x;
+  q.variant.rgba.set([47,50,38,255],4*i);
+ }
+ r=audit(q);
+ assert.equal(r.ok,true);
+ assert.equal(r.proxyCheckPassed,false);
+ assert.ok(r.warnings.includes('loss_of_local_hair_texture_gradient_proxy'));
+});
+
 test('strong fade can improve seam but fails scalp-exposure and coverage safety',()=>{
  const p=make();
  for(let y=10;y<30;y++)for(let x=17;x<60;x++){

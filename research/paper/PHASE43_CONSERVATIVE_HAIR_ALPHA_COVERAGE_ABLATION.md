@@ -117,3 +117,54 @@ measured real alpha MAE remains **quality NOT VERIFIED**.
 NO-GO until actual consented independent human hair-alpha
 data, commercially cleared style-transfer weights, physical
 Android device tests and blinded photographic assessment exist.**
+
+
+## Verified outcomes — actual model inference on catalog source
+
+**Full CI PASS (commit `1748b72e789c783433a10a8f6575721ae821b6fa`):**
+https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39836893817
+
+The complete workflow verified the unit suite, real local
+MediaPipe + MI-GAN + MODNet inference, model SHA integrity,
+browser research UI, photo consent/face protection, exactly repeated
+airplane-mode results, and full offline assets. No CI steps failed.
+
+### Controlled independent *synthetic* held-out alpha regression
+
+A deterministic hand-generated photograph-like RGB/alpha mixture
+had 62.09% of unknown pixels left accepted after deliberately
+masking some valid original predictions. The Phase43 conditional
+fit raised selective coverage to 97.77%.
+
+- Earlier synthetic selective MAE: **0.0007855**
+- New synthetic selective MAE: **0.0006994**
+- Entire benchmark synthetic; does NOT validate human strand labels
+  or transfer image realism. Outlier and low-contrast refusal tests
+  also passed.
+
+### Real catalog image — no external hair-alpha ground truth
+
+| Quantity | Phase40 baseline | Phase43 additional | Phase43 total |
+|---|---:|---:|---:|
+| Unknown hair boundary | 11,284 | — | 11,284 |
+| Previously supported estimates | 3,903 | — | 3,903 retained exactly |
+| Newly inferred hypotheses | 0 | **339** | **339** |
+| All estimated unknowns | 3,903 | +339 | **4,242** |
+| Still unresolved | 7,381 | -339 | **7,042** |
+| Coverage | 34.5888% | +3.0043 percentage points | **37.5931%** |
+
+The increase comes ONLY from accepted *neighbor-assisted RGB*
+hypotheses. No new geometric hair support, actual new strand,
+facial modification, improved hairline authenticity, separate
+donor reference, or generative model is introduced.
+
+In full airplane mode, the exact 339 newly accepted pixels and
+all rejection reason totals reproduced. No portraits uploaded.
+
+**Interpretation:** This is a modest coverage increase, not a
+commercial quality milestone. In particular, the 7,042 unknown
+pixels are still explicitly signalled. It does not repair the
+artificial forehead hair cap measured in Phase35. A productive
+future step is real independently labelled hair-vs-skin alpha
+data and human photo-level ratings; improving coverage without
+measured accuracy is not itself evidence of better hairstyles.

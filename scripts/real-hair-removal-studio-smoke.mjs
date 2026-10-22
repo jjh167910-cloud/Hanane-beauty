@@ -349,6 +349,57 @@ try{
  console.log('PHASE28 ANONYMOUS BROWSER PERFORMANCE EXPORT PASSED '+JSON.stringify({
   exportedBytes:deviceString.length,photoContentExcluded:true,verifiedGenerator:false,
   commercialReleaseAllowed:false}));
+
+ // Phase 30: use the ACTUAL offline catalog file as an externally supplied
+ // local reference fixture. It is NOT an independently verified second person.
+ const localFixture=await page.evaluate(()=>window.OFFLINE_IMAGES?.['3']||null);
+ assert.match(localFixture||'',/^data:image\/(png|jpeg|webp);base64,/);
+ const dataType=localFixture.match(/^data:(image\/[a-z]+);base64,/)[1];
+ const fixtureBytes=Buffer.from(localFixture.split(',')[1],'base64');
+ assert.ok(fixtureBytes.length>1024);
+ await page.locator('#referenceSample').selectOption('local');
+ await page.locator('#referencePhoto').setInputFiles({
+  name:'catalog-reference-ci-fixture.'+(dataType==='image/png'?'png':dataType==='image/webp'?'webp':'jpg'),
+  mimeType:dataType,buffer:fixtureBytes
+ });
+ assert.equal(await page.locator('#referencePhoto').inputValue(),'',
+  'Uploading without separate reference permission must clear the file');
+ await page.locator('#referenceConsent').check();
+ await page.locator('#referencePhoto').setInputFiles({
+  name:'catalog-reference-ci-fixture.'+(dataType==='image/png'?'png':dataType==='image/webp'?'webp':'jpg'),
+  mimeType:dataType,buffer:fixtureBytes
+ });
+ await page.waitForFunction(()=>document.querySelector('#referenceStatus').textContent
+  .includes('فقط در حافظه'),{timeout:15000});
+ assert.equal(await page.locator('#referenceSample').inputValue(),'local');
+ await page.locator('#previewTransfer').click();
+ await page.waitForFunction(()=>window.__hananehTransferStage!==null,{timeout:60000});
+ const localPhotoPreview=await page.evaluate(()=>window.__hananehTransferStage);
+ assert.equal(localPhotoPreview.ok,true,'Real uploaded-reference offline preview: '+localPhotoPreview.reason);
+ assert.equal(localPhotoPreview.referenceFromLocalFile,true);
+ assert.equal(localPhotoPreview.differentPersonVerified,false);
+ assert.equal(localPhotoPreview.referenceRightsIndependentlyVerified,false);
+ assert.equal(localPhotoPreview.exportAllowed,false);
+ await page.locator('#landmarkWarp').click();
+ const localWarp=await page.evaluate(()=>window.__hananehLandmarkStage);
+ assert.ok(localWarp,'Uploaded-photo warp must either succeed or explicitly refuse');
+ assert.equal(localWarp.exportAllowed,false);
+ console.log('PHASE30 ACTUAL BROWSER-UPLOADED REFERENCE '+JSON.stringify({
+  localReferenceProcessed:true,rigidTransferAccepted:localPhotoPreview.ok,
+  sixAnchorGeometryAccepted:localWarp.ok,differentPersonVerified:false,
+  referenceRightsIndependentlyVerified:false,commercialReleaseAllowed:false}));
+ await page.locator('#referenceConsent').uncheck();
+ assert.equal(await page.locator('#referencePhoto').inputValue(),'');
+ assert.equal(await page.evaluate(()=>window.__hananehTransferStage),null);
+ assert.equal(await page.locator('#landmarkWarp').isDisabled(),true);
+ await page.locator('#referenceSample').selectOption(eligible.id);
+ await page.locator('#previewTransfer').click();
+ await page.waitForFunction(()=>window.__hananehTransferStage!==null,{timeout:60000});
+ assert.equal(await page.evaluate(()=>window.__hananehTransferStage?.ok),true,
+  'Catalog fixture reference must still work after local-photo consent withdrawal');
+ assert.deepEqual(external,[]);
+ assert.deepEqual(errors,[]);
+
  // Withdrawal must remove export permission and discard any previous proof.
  await page.locator('#approve').uncheck();
  assert.equal(await page.locator('#download').isDisabled(),true,

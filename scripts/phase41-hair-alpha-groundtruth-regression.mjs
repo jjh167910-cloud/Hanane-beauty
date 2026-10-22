@@ -87,3 +87,51 @@ test('all-abstained is NOT falsely high accuracy; no error becomes null',()=>{
  assert.equal(m.metrics.estimatedRootMeanSquaredError,null);
  assert.equal(m.metrics.abstentionFraction,1);
 });
+
+
+// An information-theoretic counterexample: changing only the unknown
+// pixels' physical foreground color and alpha can leave EVERY observed
+// photograph pixel unchanged. The model cannot distinguish the two.
+test('identical observed pixels admit contradictory plausible hair-alpha truth',()=>{
+ const p=scene('simple-straight');
+ const predicted=infer(p);
+ const alternative=p.groundTruthAlpha.slice();
+ let materiallyDifferent=0;
+ for(let i=0;i<N;i++){
+  if(p.trimap.trimap[i]!==128)continue;
+  const original=alternative[i];
+  const newAlpha=Math.min(1,original+.16);
+  // Let the old local BG anchor be [203,194,170] and choose an
+  // alternative per-pixel physical hair foreground color:
+  // F_alt=(I-(1-a_alt)*B)/a_alt. Its RGB remains in [0,255].
+  // The same displayed RGB and all seeds are therefore consistent
+  // with a different alpha. No model gets to inspect this new F.
+  for(let c=0;c<3;c++){
+   const observed=p.sourceRGBA[i*4+c],B=[203,194,170][c];
+   const altF=(observed-(1-newAlpha)*B)/newAlpha;
+   assert.ok(altF>=0&&altF<=255);
+  }
+  alternative[i]=newAlpha;
+  if(newAlpha-original>.05)materiallyDifferent++;
+ }
+ assert.ok(materiallyDifferent>100);
+ const primary=audit({prediction:predicted,
+  groundTruthAlpha:p.groundTruthAlpha,trimap:p.trimap.trimap,width:W,height:H});
+ const rival=audit({prediction:predicted,
+  groundTruthAlpha:alternative,trimap:p.trimap.trimap,width:W,height:H});
+ assert.equal(primary.ok,true);
+ assert.equal(rival.ok,true);
+ assert.equal(primary.metrics.coverage,rival.metrics.coverage,
+  'Prediction and abstention cannot change when the observed photo is identical');
+ assert.ok(primary.metrics.estimatedMeanAbsoluteError<.01);
+ assert.ok(rival.metrics.estimatedMeanAbsoluteError>.10,
+  'An equally image-compatible physical alpha should disagree substantially');
+ assert.equal(rival.realHumanQualityVerified,false);
+ console.log('PHASE41 UNIDENTIFIABLE ALPHA COUNTEREXAMPLE '+JSON.stringify({
+  photoPixelsIdentical:true,trimapIdentical:true,
+  alternativePhysicalHairColorsWithinByteRange:true,
+  coverage:primary.metrics.coverage,
+  originalSyntheticMAE:primary.metrics.estimatedMeanAbsoluteError,
+  alternateImageCompatibleMAE:rival.metrics.estimatedMeanAbsoluteError,
+  photorealisticStrandsProven:false}));
+});

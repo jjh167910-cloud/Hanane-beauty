@@ -14,10 +14,10 @@ const make=()=>{
   restoredRGBA.set([90,95,101,255],4*i);sourceHairRGBA.set([0,0,0,255],4*i);
  }
  for(let y=10;y<40;y++)for(let x=17;x<60;x++){
-  const i=y*W+x;old[i]=255;next[i]=253;
+  const i=y*W+x;old[i]=255;next[i]=254;
   a.set([47,50,38,255],4*i);b.set([47,50,38,255],4*i);
   if(y===10||x===17||x===59||y===39){
-   next[i]=230;b.set([55,57,46,255],4*i);
+   next[i]=237;b.set([55,57,46,255],4*i);
   }
   if(y<20){keepMask[i]=0;sourceHairRGBA[4*i]=255;}
  }

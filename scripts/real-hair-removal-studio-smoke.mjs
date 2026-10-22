@@ -93,6 +93,15 @@ try{
  assert.deepEqual(external,[]);
  assert.deepEqual(errors,[]);
  await page.screenshot({path:path.join(root,'ai/migan/hair-removal-studio-evidence.png'),fullPage:true});
+ // Withdrawal must remove export permission and discard any previous proof.
+ await page.locator('#approve').uncheck();
+ assert.equal(await page.locator('#download').isDisabled(),true,
+  'Revoked approval must disable previous neural output export');
+ assert.equal(await page.evaluate(()=>window.__hananehHairStage),null,
+  'Revoked approval must delete prior evidence from page state');
+ await page.locator('#approve').check();
+ assert.equal(await page.locator('#run').isEnabled(),true,
+  'Consent reapproval may begin a new independent inference');
  console.log('REAL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({...result,trial:pass.id,...comparison}));
  await page.locator('#prepareOffline').click();
  await page.waitForFunction(()=>typeof window.__hananehOfflineReady==='boolean',{timeout:90000});

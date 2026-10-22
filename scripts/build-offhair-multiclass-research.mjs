@@ -31,4 +31,22 @@ const provenance={name:'MediaPipe Selfie Multiclass Segmentation 256x256',
  sha256:sha,bytes:model.length,modifiedWeights:false,
  audit:'Checkpoint is usable under the public model-card license; separately assess data provenance and intended use before commercialization.'};
 await fs.writeFile(path.join(root,'public/ai/models/offhair-multiclass-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
+// Distribute the full license text alongside the model, not merely a link.
+const licenseDir=path.join(root,'public/ai/licenses');
+await fs.mkdir(licenseDir,{recursive:true});
+let license;
+for(const candidate of [
+ path.join(root,'node_modules/@mediapipe/tasks-vision/LICENSE'),
+ path.join(root,'node_modules/@mediapipe/tasks-vision/LICENSE.txt')]){
+ try{license=await fs.readFile(candidate,'utf8');break;}catch(e){if(e.code!=='ENOENT')throw e;}
+}
+if(!license){
+ const response=await fetch('https://www.apache.org/licenses/LICENSE-2.0.txt',
+  {signal:AbortSignal.timeout(30000)});
+ if(!response.ok)throw Error('Cannot obtain full Apache-2.0 distribution terms');
+ license=await response.text();
+}
+if(!/Apache License\s+Version 2\.0/.test(license)||license.length<8000)
+ throw Error('Invalid or incomplete Apache-2.0 license text');
+await fs.writeFile(path.join(licenseDir,'Apache-2.0.txt'),license);
 console.log('PINNED GOOGLE MULTICLASS BASELINE '+JSON.stringify({bytes:model.length,sha256:sha,license:provenance.license}));

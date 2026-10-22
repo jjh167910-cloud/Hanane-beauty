@@ -299,6 +299,20 @@ try{
  assert.equal(uiTransfer.previewOnly,true);
  assert.equal(uiTransfer.exportAllowed,false);
  assert.equal(uiTransfer.generatedNewHair,false);
+ // Phase 29: real MediaPipe six-landmark fitting is an optional research
+ // comparison; missing ear/nose landmarks must fail safely, not be invented.
+ await page.locator('#landmarkWarp').click();
+ const liveWarp=await page.evaluate(()=>window.__hananehLandmarkStage);
+ assert.ok(liveWarp,'Landmark research control did not execute');
+ assert.equal(liveWarp.exportAllowed,false);
+ assert.equal(liveWarp.referenceHairstyleGenerated,false);
+ if(liveWarp.ok){
+  assert.equal(liveWarp.geometry.anchorCount,6);
+  assert.ok(liveWarp.geometry.postFitMeanPx<=liveWarp.geometry.preFitMeanPx+.05);
+  assert.ok(liveWarp.comparisonChangedPixels>=0);
+  assert.equal(liveWarp.independentVisualQualityRating,null);
+ }else assert.match(liveWarp.reason,/Landmark-based donor alignment rejected/);
+ console.log('PHASE29 REAL SIX-ANCHOR FACE FIT '+JSON.stringify(liveWarp));
  await page.locator('#targetAware').click();
  await page.waitForFunction(()=>!!window.__hananehTargetAwareStage,{timeout:180000});
  const liveTarget=await page.evaluate(()=>window.__hananehTargetAwareStage);
@@ -341,6 +355,10 @@ try{
   'Revoked approval must disable previous neural output export');
  assert.equal(await page.evaluate(()=>window.__hananehHairStage),null,
   'Revoked approval must delete prior evidence from page state');
+ assert.equal(await page.locator('#landmarkWarp').isDisabled(),true,
+  'Revoked consent must disable geometry research');
+ assert.equal(await page.evaluate(()=>window.__hananehLandmarkStage),null,
+  'Revoked consent must erase previous facial landmark fit diagnostics');
  assert.equal(await page.locator('#deviceEvidence').isDisabled(),true,
   'Revoked approval must disable performance evidence download');
  await page.locator('#approve').check();
@@ -392,6 +410,19 @@ try{
   'Protected transfer pixel counts must match across online and offline inference');
  assert.deepEqual(offlinePreview.diagnosticFlags,uiTransfer.diagnosticFlags,
   'Offline reload must not conceal the same visual failure warnings');
+ await page.locator('#landmarkWarp').click();
+ const offlineWarp=await page.evaluate(()=>window.__hananehLandmarkStage);
+ assert.ok(offlineWarp,'Six-anchor result must exist on airplane-mode repeat');
+ assert.equal(offlineWarp.exportAllowed,false);
+ assert.equal(offlineWarp.ok,liveWarp.ok,
+  'Offline reload must preserve acceptance/refusal of face geometry');
+ if(offlineWarp.ok){
+  assert.deepEqual(offlineWarp.geometry,liveWarp.geometry,
+   'Same local reference images should reproduce pose-fit geometry');
+  assert.equal(offlineWarp.comparisonChangedPixels,liveWarp.comparisonChangedPixels);
+ }else assert.equal(offlineWarp.reason,liveWarp.reason);
+ console.log('PHASE29 AIRPLANE MODE LANDMARK FIT '+JSON.stringify({
+  accepted:offlineWarp.ok,commercialExportAllowed:false}));
  await page.locator('#targetAware').click();
  await page.waitForFunction(()=>!!window.__hananehTargetAwareStage,{timeout:180000});
  const offlineTarget=await page.evaluate(()=>window.__hananehTargetAwareStage);

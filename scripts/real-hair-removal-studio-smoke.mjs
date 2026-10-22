@@ -499,6 +499,32 @@ try{
   modelRanWithNetworkDisabled:true,
   noPhotosOrHardwareIdentifiersExported:true,commercialReleaseAllowed:false}));
 
+ // Reference photos selected from the local file picker must work even
+ // after the app reloads with the browser network completely disabled.
+ await page.locator('#referenceSample').selectOption('local');
+ await page.locator('#referenceConsent').check();
+ await page.locator('#referencePhoto').setInputFiles({
+  name:'local-photo-airplane-mode.'+(dataType==='image/png'?'png':dataType==='image/webp'?'webp':'jpg'),
+  mimeType:dataType,buffer:fixtureBytes
+ });
+ await page.waitForFunction(()=>document.querySelector('#referenceStatus').textContent
+  .includes('فقط در حافظه'),{timeout:15000});
+ await page.locator('#previewTransfer').click();
+ await page.waitForFunction(()=>!!window.__hananehTransferStage,{timeout:60000});
+ const offlineLocalPreview=await page.evaluate(()=>window.__hananehTransferStage);
+ assert.equal(offlineLocalPreview.ok,true,'Local reference failed in airplane mode: '+offlineLocalPreview.reason);
+ assert.equal(offlineLocalPreview.referenceFromLocalFile,true);
+ assert.equal(offlineLocalPreview.exportAllowed,false);
+ assert.equal(offlineLocalPreview.differentPersonVerified,false);
+ assert.deepEqual(offlineLocalPreview.counts,localPhotoPreview.counts,
+  'Online and offline file picker must yield the exact same counted hair pixels');
+ await page.locator('#referenceConsent').uncheck();
+ assert.equal(await page.locator('#referencePhoto').inputValue(),'');
+ assert.equal(await page.evaluate(()=>window.__hananehTransferStage),null);
+ console.log('PHASE30 AIRPLANE MODE LOCAL REFERENCE REPEAT '+JSON.stringify({
+  successfulOfflinePreview:true,samePixelCounts:true,
+  differentPersonVerified:false,commercialExportAllowed:false}));
+
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
  console.log('AIRPLANE MODE FULL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({inferenceMs:result.inferenceMs,cacheFiles:stored.files,referenceHairstyleTransfer:result.generatedHair}));
  // Study existing bundled salon portraits without uploading them. Fail-closed rejects

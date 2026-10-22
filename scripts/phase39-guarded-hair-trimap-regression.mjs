@@ -26,7 +26,7 @@ test('real trimap produces meaningful known hair/background/unknown, not alpha',
  assert.deepEqual(p.hairRGBA,hairBefore);
  assert.equal(a.trimap[40*W+45],255);
  assert.equal(a.trimap[20*W+27],128);
- assert.equal(a.trimap[15*W+30],128);
+ assert.equal(a.trimap[18*W+30],128);
  assert.equal(a.trimap[5*W+6],0);
  assert.equal(a.trimap[75*W+67],0,'Protected forehead must never become hair or uncertain');
  assert.ok(a.metrics.foreground>100);

@@ -43,6 +43,8 @@ jobs:
         run: node scripts/real-offhair-annotator-smoke.mjs
       - name: Build research-only MI-GAN (pinned checksum)
         run: npm run build:migan
+      - name: Fetch exact SHA-pinned Apache-2 MODNet portrait-alpha model (NOT a hair matte)
+        run: npm run build:modnet
       - name: Verify browser-only neural inpainting and airplane-mode rerun
         run: node scripts/real-migan-browser-smoke.mjs
       - name: Verify integrated face-protected hair removal in-browser, including offline rerun

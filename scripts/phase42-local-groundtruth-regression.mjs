@@ -60,6 +60,8 @@ test('local alpha label error is numerical, jointly reported with abstentions an
  assert.equal(result.exportAllowed,false);
  assert.equal(result.heatmapRGBA.length,N*4);
  assert.equal(result.actualPortraitHairlineQualityProven,false);
+ assert.equal(result.maskPlausibilityReviewRequired,false);
+ assert.equal(result.scoreUsableAsHairQualityEvidence,false);
 });
 test('no image/mask consent, forged gt certainty or unreadable mask fails closed',()=>{
  const p=sample(),d=decode({maskRGBA:p.rgba,width:W,height:H});
@@ -89,6 +91,8 @@ test('conflicting real hair labels on protected skin are counted, never edited',
   width:W,height:H,claims:permission});
  assert.equal(r.ok,true,r.reason);
  assert.equal(r.metrics.labelConflictsWithProtectedFacePixels,1);
+ assert.equal(r.maskPlausibilityReviewRequired,false,
+  'A single plausible hair-over-forehead wisp cannot force gross misalignment');
  assert.deepEqual(p.prediction.alpha,before);
  assert.equal(r.photographicGroundTruthVerified,false);
  p.trimap.trimap[i]=128;
@@ -107,4 +111,20 @@ test('all unknown abstentions produce null MAE, not fictitious zero error',()=>{
  assert.equal(r.metrics.selectiveMAE,null);
  assert.equal(r.metrics.selectiveRMSE,null);
  assert.equal(r.metrics.abstainedPixels,r.metrics.unknownPixels);
+});
+
+test('severely misaligned mask is marked unsuitable, never a quality score',()=>{
+ const p=sample(),d=decode({maskRGBA:p.rgba,width:W,height:H});
+ const fake=d.alpha.slice();
+ // Incorrectly label the whole protected lower-face region as hair.
+ for(let y=65;y<85;y++)for(let x=68;x<88;x++)fake[y*W+x]=.85;
+ const report=assess({prediction:p.prediction,trimap:p.trimap,
+  labelAlpha:fake,semanticVeto:p.semanticVeto,faceZones:p.faceZones,
+  width:W,height:H,claims:permission});
+ assert.equal(report.ok,true,report.reason);
+ assert.equal(report.maskPlausibilityReviewRequired,true);
+ assert.equal(report.metrics.severeFaceDisagreement,true);
+ assert.equal(report.scoreUsableAsHairQualityEvidence,false);
+ assert.equal(report.photographicGroundTruthVerified,false);
+ assert.equal(report.exportAllowed,false);
 });

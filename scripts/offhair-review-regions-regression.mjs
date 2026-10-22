@@ -77,3 +77,35 @@ test('malformed review maps and abusive settings fail closed',()=>{
  assert.throws(()=>prioritizeModelDisagreements(grid(),W,H,{connectivity:6}),/settings/);
  assert.throws(()=>prioritizeModelDisagreements(new Uint16Array(N),W,H),/Invalid semantic/);
 });
+
+test('every critical conflict can be retrieved through reproducible pages',()=>{
+ const pts=[[0,0,4],[2,0,2],[4,0,4],[6,0,3],[8,0,4],[10,0,3]];
+ const labels=grid(pts);
+ const first=prioritizeModelDisagreements(labels,W,H,{minPixels:1,maxRegions:2,pageIndex:0});
+ assert.equal(first.totalPages,3);
+ assert.equal(first.totalCriticalRegions,3);
+ assert.equal(first.criticalRegionsOnPage,2);
+ assert.equal(first.criticalRegionsOnSubsequentPages,1);
+ assert.equal(first.nextPageIndex,1);
+ const all=[],ids=new Set();
+ for(let i=0;i<first.totalPages;i++){
+  const p=prioritizeModelDisagreements(labels,W,H,{minPixels:1,maxRegions:2,pageIndex:i});
+  assert.equal(p.pageIndex,i);
+  assert.equal(p.totalCriticalRegions,first.totalCriticalRegions);
+  assert.equal(p.allCriticalComponentsAddressable,true);
+  for(const region of p.regions){
+   assert.equal(ids.has(region.regionId),false,'No duplicated review boxes across pages');
+   ids.add(region.regionId);all.push(region);
+  }
+ }
+ assert.equal(all.length,first.reviewRegionCount);
+ assert.equal(all.filter(x=>x.hasFaceSkinConflict).length,first.totalCriticalRegions);
+ assert.equal(all.reduce((sum,x)=>sum+x.pixels,0),first.totalReviewPixels);
+ assert.deepEqual(first,prioritizeModelDisagreements(labels,W,H,
+   {minPixels:1,maxRegions:2,pageIndex:0}));
+});
+test('out-of-range page fails instead of returning an empty supposed complete review',()=>{
+ const labels=grid([[0,0,4]]);
+ assert.throws(()=>prioritizeModelDisagreements(labels,W,H,{pageIndex:1}),/out of bounds/);
+ assert.throws(()=>prioritizeModelDisagreements(labels,W,H,{pageIndex:-1}),/settings/);
+});

@@ -90,6 +90,28 @@ try{
  await page.locator('#localAlphaFit').click();
  const firstLocalFit=await page.evaluate(()=>window.__hananehLocalAlphaFitStage);
  assert.equal(firstLocalFit.ok,true,'Phase43 actual photograph local fit refused: '+firstLocalFit.reason);
+ assert.equal(await page.locator('#alphaStability').isEnabled(),true);
+ await page.locator('#alphaStability').click();
+ const firstStability=await page.evaluate(()=>window.__hananehAlphaStabilityStage);
+ assert.equal(firstStability.ok,true,'Phase44 real RGB stress refused: '+firstStability.reason);
+ assert.equal(firstStability.exportAllowed,false);
+ assert.equal(firstStability.hairAlphaGroundTruthVerified,false);
+ assert.equal(firstStability.protectedFacePixelsChanged,0);
+ assert.equal(firstStability.originalAlphaNeverReplaced,true);
+ assert.equal(firstStability.metrics.unknownPixels,firstLocalFit.metrics.unknownPixels);
+ assert.equal(firstStability.metrics.originalAcceptedPixels,firstColorline.metrics.resolvedUnknownPixels);
+ assert.equal(firstStability.metrics.previouslyNewEstimatedPixels,
+   firstLocalFit.metrics.newlyEstimatedPixels);
+ assert.equal(firstStability.metrics.stressStableNewPixels+
+   firstStability.metrics.withdrawnUnstablePixels,firstLocalFit.metrics.newlyEstimatedPixels);
+ assert.ok(firstStability.metrics.finalStressGatedCoverage<=firstLocalFit.metrics.newCoverage);
+ console.log('PHASE44 REAL LOCAL HAIR ALPHA RGB STABILITY '+JSON.stringify({
+  previousNewHypotheses:firstStability.metrics.previouslyNewEstimatedPixels,
+  retainedUnderPerturbation:firstStability.metrics.stressStableNewPixels,
+  withdrawnFragileHypotheses:firstStability.metrics.withdrawnUnstablePixels,
+  finalUnknown:firstStability.metrics.remainingAbstentions,
+  finalCoverage:firstStability.metrics.finalStressGatedCoverage,
+  realHairAlphaGroundTruth:false,exportAllowed:false}));
  assert.equal(firstLocalFit.exportAllowed,false);
  assert.equal(firstLocalFit.independentlyValidatedHairAlpha,false);
  assert.equal(firstLocalFit.baselineUnchanged,true);
@@ -714,6 +736,9 @@ try{
   'Photo consent withdrawal must erase prior fractional hair-alpha results');
  assert.equal(await page.evaluate(()=>window.__hananehLocalAlphaFitStage),null,
   'Photo consent withdrawal must erase derived local color-regression texture');
+ assert.equal(await page.evaluate(()=>window.__hananehAlphaStabilityStage),null,
+  'Photo consent withdrawal must erase RGB stability results');
+ assert.equal(await page.locator('#alphaStability').isDisabled(),true);
  assert.equal(await page.locator('#localAlphaFit').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehLocalGroundTruthStage),null,
   'Source/reference permission withdrawal must discard third-party masks and numbers');
@@ -779,6 +804,7 @@ try{
     '/ai/migan/guarded-hair-trimap.mjs',
     '/ai/migan/hair-alpha-colorline-research.mjs',
     '/ai/migan/hair-alpha-local-regression.mjs',
+    '/ai/migan/hair-alpha-stability-gate.mjs',
     '/ai/migan/hair-alpha-local-groundtruth.mjs',
     ...manifest.parts.map(p=>'/ai/migan/parts/'+p.name)];
    return {files:files.length,present:await Promise.all(files.map(async p=>!!(await cache.match(p))))};
@@ -809,6 +835,17 @@ try{
  await page.locator('#localAlphaFit').click();
  const offlineLocalFit=await page.evaluate(()=>window.__hananehLocalAlphaFitStage);
  assert.equal(offlineLocalFit.ok,true,'Offline regression stage rejected: '+offlineLocalFit.reason);
+ await page.locator('#alphaStability').click();
+ const offlineStability=await page.evaluate(()=>window.__hananehAlphaStabilityStage);
+ assert.equal(offlineStability.ok,true,'Phase44 RGB stress must work offline: '+offlineStability.reason);
+ assert.deepEqual(offlineStability.metrics,firstStability.metrics,
+  'RGB stress must produce same withdrawn/stable counts in airplane mode');
+ assert.equal(offlineStability.exportAllowed,false);
+ console.log('PHASE44 AIRPLANE MODE RGB STRESS GATE '+JSON.stringify({
+  deterministic:true,
+  stableHypotheses:offlineStability.metrics.stressStableNewPixels,
+  withdrawn:offlineStability.metrics.withdrawnUnstablePixels,
+  dataUploaded:false,qualityCertified:false}));
  assert.deepEqual(offlineLocalFit.metrics,firstLocalFit.metrics,
   'Real photo local RGB fitting must produce identical metrics with networking disabled');
  assert.equal(offlineLocalFit.exportAllowed,false);

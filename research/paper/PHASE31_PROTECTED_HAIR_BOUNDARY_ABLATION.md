@@ -75,3 +75,45 @@ and a real hairstyle generator are still unresolved.
 pixel counts to this report, and record whether the boundary proxy
 actually decreased for each trial. If quality is not measurable, do not
 promote this overlay as a meaningful quality gain.
+
+
+## Verified real browser result (October 22, 2026)
+
+Successful full GitHub CI for exactly code + original Phase 31 report
+commit `8c6cb26d834cb3189234498a1f37ea1f5a7be25a`:
+https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39798664766
+
+The test used the real MediaPipe hair segmenter, six-class
+semantic skin veto, MI-GAN reconstruction and bundled catalog images
+in Chromium, with a repeat after disconnecting browser networking.
+
+| A/B measurement | Baseline | Feathered |
+|---|---:|---:|
+| Boundary mean absolute RGB jump across original hair-mask edge | 64.08555 | 28.89227 |
+| Pixels differing between the A/B rendered previews | — | 2,311 |
+| Donor pixels with reduced alpha | — | 2,317 |
+| Known protected face/skin pixels changed | 0 | 0 |
+| Output allowed for customers | No | No |
+
+The chosen boundary RGB discontinuity **proxy** decreased approximately
+54.9%. This is not a 54.9% visual-quality improvement. Its absolute
+scale is channel units and depends heavily on pose, donor hair colors
+and source background; it is measured only on one non-independent
+catalog pair. A smoother boundary might conceal strands, reveal gray
+inpainting or violate visual hairline fidelity despite a lower score.
+
+The real browser smoke also exercised a locally picked reference file
+and verified the new matting could run and was identical after a full
+network-disabled PWA reload. Source and reference consent revocation
+cleared the result and prevented export. The existing
+`fringe_occlusion_unresolved` and
+`predicted_skin_occlusion_unresolved` warnings still apply.
+
+**Engineering A/B: PASS. Human-rated improvement: NOT MEASURED.
+Realistic generative hairstyle transfer: NO-GO. Android device
+performance: NOT MEASURED. Commercial salon use: NO-GO.**
+
+Next experiment, contingent on image rights: collect independent
+different-person examples and compare human-rated hair strand loss,
+hairline realism, identity preservation, and failure/rejection rates.
+Do not optimize only this proxy.

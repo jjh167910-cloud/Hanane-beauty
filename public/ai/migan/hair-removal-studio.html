@@ -10,6 +10,10 @@
 .vote-actions button{padding:10px 5px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);font:inherit;font-size:12px;cursor:pointer}
 .vote-actions button[aria-pressed=true]{border-color:#735531;background:#f5e7d2;font-weight:700}
 .review-status{font-size:13px;color:var(--quiet)}
+body.review-focus main>:not(#humanReview){display:none!important}
+body.review-focus #humanReview{margin-top:0;min-height:calc(100vh - 28px)}
+.review-context{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-width:650px;margin:10px auto 22px;gap:10px}
+.review-context canvas{max-height:240px;object-fit:contain}
 @media(max-width:650px){.vote-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:1fr}main{padding:19px 13px 60px}.panel{padding:13px}.viewer canvas{max-width:480px;margin:auto}}
 </style></head><body><main>
 <a href="../../index.html">← بازگشت به کاتالوگ</a>
@@ -63,9 +67,14 @@
 <p id="transferStatus" role="status" aria-live="polite">ابتدا بازسازی عصبی مرحلهٔ سوم را اجرا کنید.</p>
 <pre id="transferMetrics">No reference transfer generated · research only</pre></section>
 <section class="panel" id="humanReview"><h2>۵. مقایسهٔ چشمی تصادفی و آفلاین — صرفاً پژوهشی</h2>
-<p class="aside">پس از ساخت پیش‌نمایش و نسخهٔ لبهٔ نرم، دو تصویر با ترتیب تصادفی A و B نشان داده می‌شوند. هیچ امتیازی توسط هوش مصنوعی یا تست خودکار به‌جای داور انسانی ثبت نمی‌شود. اگر خودتان روش‌ها را دیده‌اید، این ارزیابی «کورِ مستقل» محسوب نمی‌شود. برای بررسی مدل مو، عکس اصلی و مرجع را از بخش‌های بالا ببینید.</p>
+<p class="aside">پس از ساخت پیش‌نمایش و نسخهٔ لبهٔ نرم، دو تصویر با ترتیب تصادفی A و B نشان داده می‌شوند. هیچ امتیازی توسط هوش مصنوعی یا تست خودکار به‌جای داور انسانی ثبت نمی‌شود. اگر خودتان روش‌ها را دیده‌اید، این ارزیابی «کورِ مستقل» محسوب نمی‌شود. هنگام پاسخ‌گویی، روش‌های نام‌گذاری‌شده پنهان می‌شوند و عکس اصلی و مدل موی مرجع همین‌جا دیده می‌شوند.</p>
 <div class="actions"><button type="button" class="btn soft" id="reviewStart" disabled>شروع مقایسهٔ تصادفی</button>
-<button type="button" class="btn soft" id="reviewDiscard" disabled>حذف رأی‌ها از حافظه</button></div>
+<button type="button" class="btn soft" id="reviewDiscard" disabled>حذف رأی‌ها از حافظه</button>
+<button type="button" class="btn soft" id="reviewExit" disabled>بازگشت به آزمایشگاه (پایان حالت تمرکز)</button></div>
+<div class="review-context">
+<div class="viewer"><div class="lbl">چهرهٔ اصلی شخص</div><canvas id="reviewSourcePortrait" width="512" height="512"></canvas></div>
+<div class="viewer"><div class="lbl">مدل موی مرجع</div><canvas id="reviewReferencePortrait" width="512" height="512"></canvas></div>
+</div>
 <div class="review-pair"><div class="viewer"><div class="lbl">گزینهٔ A</div><canvas id="reviewCanvasA" width="512" height="512" aria-label="تصویر گزینهٔ آ"></canvas></div>
 <div class="viewer"><div class="lbl">گزینهٔ B</div><canvas id="reviewCanvasB" width="512" height="512" aria-label="تصویر گزینهٔ ب"></canvas></div></div>
 <div id="reviewQuestions" aria-label="پرسش‌های مقایسهٔ تصویری"></div>
@@ -102,8 +111,11 @@ function clearBlindReview(){
  $('reviewStart').disabled=true;
  $('reviewDiscard').disabled=true;
  $('reviewExport').disabled=true;
+ $('reviewExit').disabled=true;
+ document.body.classList.remove('review-focus');
  $('reviewQuestions').replaceChildren();
  clearCanvas($('reviewCanvasA'));clearCanvas($('reviewCanvasB'));
+ clearCanvas($('reviewSourcePortrait'));clearCanvas($('reviewReferencePortrait'));
  $('reviewStatus').textContent='بازبینی با تغییر عکس یا رضایت حذف شد.';
  window.__hananehBlindReviewStage=null;
 }
@@ -481,6 +493,11 @@ $('reviewStart').addEventListener('click',()=>{
  const methodB=reviewSession.candidateSide()==='B'?'softEdgePortrait':'transferPortrait';
  $('reviewCanvasA').getContext('2d').drawImage($(methodA),0,0,S,S);
  $('reviewCanvasB').getContext('2d').drawImage($(methodB),0,0,S,S);
+ $('reviewSourcePortrait').getContext('2d').drawImage($('portrait'),0,0,S,S);
+ $('reviewReferencePortrait').getContext('2d').drawImage($('referencePortrait'),0,0,S,S);
+ document.body.classList.add('review-focus');
+ $('reviewExit').disabled=false;
+ $('humanReview').scrollIntoView({block:'start'});
  const container=$('reviewQuestions');container.replaceChildren();
  const opts=[['A','گزینهٔ A'],['B','گزینهٔ B'],['tie','برابر'],['cannot_judge','قابل قضاوت نیست']];
  for(const question of REVIEW_QUESTIONS){
@@ -505,6 +522,14 @@ $('reviewStart').addEventListener('click',()=>{
  }
  $('reviewDiscard').disabled=false;$('reviewStart').disabled=false;
  setReviewStatus();
+});
+$('reviewExit').addEventListener('click',()=>{
+ document.body.classList.remove('review-focus');
+ $('reviewExit').disabled=true;
+ // Leaving focused mode allows a reviewer to see method labels; no JSON
+ // from this tool can certify independent blinding regardless.
+ if(reviewSession)$('reviewStatus').textContent=
+  'از حالت تمرکز خارج شدید؛ مستقل بودن داوری تأیید نمی‌شود.';
 });
 $('reviewDiscard').addEventListener('click',()=>{
  clearBlindReview();

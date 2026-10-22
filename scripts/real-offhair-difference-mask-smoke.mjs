@@ -43,7 +43,7 @@ try{
  const measure=async()=>{
   const {getLocalHairSegmenter}=await import('/ai/hair-segmenter.mjs');
   const {getLocalMulticlassSegmenter,compareHairModelMasks,reviewMulticlassHairConsensus}=await import('/ai/offhair-multiclass-baseline.mjs');
-  const {prioritizeModelDisagreements}=await import('/ai/offhair-review-regions.mjs');
+  const {createModelDisagreementReviewSession}=await import('/ai/offhair-review-regions.mjs');
   const {differenceMaskStudy,mapTopologyToRGBA}=await import('/ai/offhair-difference-masks.mjs');
   const {observationFromFaceAnchor,transferSupportMask,gateTargetSupport}=await import('/ai/offhair-pose-flow.mjs');
   const {makeLandmarkFaceZones}=await import('/ai/offhair-face-zones.mjs');
@@ -77,14 +77,14 @@ try{
     const review=reviewMulticlassHairConsensus(
      semantics.labels,semantics.width,semantics.height,observations[id].mask,dim,dim);
     const params={connectivity:8,minPixels:8,maxRegions:20};
-    const triage=prioritizeModelDisagreements(review.labels,review.width,review.height,params);
+    const reviewSession=createModelDisagreementReviewSession(review.labels,review.width,review.height,{connectivity:params.connectivity});
+    const triage=reviewSession.page(params);
     // Every high-priority skin conflict must be addressable, even after the
     // first page. This verifies QUEUE COVERAGE, not human review completion.
     let cursor=0,pages=0,enumeratedCritical=0,enumeratedEligible=0;
     const seen=new Set();
     do{
-     const pageResult=prioritizeModelDisagreements(review.labels,review.width,review.height,
-      {...params,pageIndex:cursor});
+     const pageResult=reviewSession.page({...params,pageIndex:cursor});
      pages++;
      if(pages>1000)throw Error('Unbounded triage page queue');
      for(const region of pageResult.regions){

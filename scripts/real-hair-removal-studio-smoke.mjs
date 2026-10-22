@@ -310,6 +310,10 @@ try{
  assert.ok(liveEdge.changedPixels>0);
  assert.ok(liveEdge.counts.softenedPixels>0);
  assert.ok(liveEdge.counts.boundaryPairs>0);
+ assert.ok(liveEdge.retentionRisk?.metrics?.donorOpacityRetentionFraction>0);
+ assert.equal(liveEdge.retentionRisk?.exportAllowed,false);
+ assert.equal(liveEdge.retentionRisk?.humanHairQualityVerified,false);
+ console.log('PHASE32 REAL HAIR RETENTION SAFETY CHECK '+JSON.stringify(liveEdge.retentionRisk));
  console.log('PHASE31 REAL HAIR CUTOUT INNER-EDGE ABLATION '+JSON.stringify({
   changedPixels:liveEdge.changedPixels,
   softenedPixels:liveEdge.counts.softenedPixels,
@@ -403,6 +407,8 @@ try{
  assert.equal(localEdge.ok,true,'User-local reference failed edge A/B: '+localEdge.reason);
  assert.equal(localEdge.exportAllowed,false);
  assert.ok(localEdge.changedPixels>0);
+ assert.ok(localEdge.retentionRisk?.metrics?.donorOpacityRetentionFraction>0);
+ assert.equal(localEdge.retentionRisk?.exportAllowed,false);
  await page.locator('#landmarkWarp').click();
  const localWarp=await page.evaluate(()=>window.__hananehLandmarkStage);
  assert.ok(localWarp,'Uploaded-photo warp must either succeed or explicitly refuse');
@@ -495,7 +501,12 @@ try{
   'Matting must be reproducible with full network disabled: '+offlineEdge.reason);
  assert.equal(offlineEdge.changedPixels,liveEdge.changedPixels);
  assert.deepEqual(offlineEdge.boundaryProxy,liveEdge.boundaryProxy);
+ assert.deepEqual(offlineEdge.retentionRisk,liveEdge.retentionRisk,
+  'Full airplane mode should reproduce coverage erosion and scalp-exposure warnings');
  assert.equal(offlineEdge.exportAllowed,false);
+ console.log('PHASE32 AIRPLANE-MODE HAIR COVERAGE AUDIT '+JSON.stringify({
+  identicalRiskMetrics:true,proxyCheckPassed:offlineEdge.retentionRisk.proxyCheckPassed,
+  hairQualityVerified:false,commercialExportAllowed:false}));
  console.log('PHASE31 AIRPLANE MODE BOUNDARY ABLATION '+JSON.stringify({
   sameChangedPixelCount:true,sameProxy:true,commercialExportAllowed:false}));
  await page.locator('#landmarkWarp').click();
@@ -558,6 +569,7 @@ try{
  assert.equal(offlineLocalEdge.ok,true,'Offline local photo matting failed: '+offlineLocalEdge.reason);
  assert.equal(offlineLocalEdge.changedPixels,localEdge.changedPixels);
  assert.deepEqual(offlineLocalEdge.boundaryProxy,localEdge.boundaryProxy);
+ assert.deepEqual(offlineLocalEdge.retentionRisk,localEdge.retentionRisk);
  assert.equal(offlineLocalEdge.exportAllowed,false);
  assert.deepEqual(offlineLocalPreview.counts,localPhotoPreview.counts,
   'Online and offline file picker must yield the exact same counted hair pixels');

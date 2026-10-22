@@ -9,7 +9,7 @@
 <a href="../../index.html">← بازگشت به کاتالوگ</a>
 <div class="eyebrow">HANANEH BEAUTY · OFFLINE RESEARCH</div>
 <h1>بازسازی آزمایشی موی قبلی، کاملاً روی دستگاه</h1>
-<p>مرحلهٔ اول: MediaPipe موی تصویر را جدا می‌کند. مرحلهٔ دوم: مدل MI-GAN تلاش می‌کند ناحیهٔ انتخاب‌شده را بازسازی کند. ناحیهٔ صورت محافظت می‌شود. این ابزار مدل موی جدید تولید نمی‌کند و برای ارائهٔ نتیجهٔ نهایی به مشتری تأیید نشده است.</p>
+<p>مرحلهٔ اول: MediaPipe موی تصویر را جدا می‌کند. مرحلهٔ دوم: مدل MI-GAN تلاش می‌کند ناحیهٔ انتخاب‌شده را بازسازی کند. ناحیهٔ صورت محافظت می‌شود. یک مدل دوم، پوست پیش‌بینی‌شده را نیز از ویرایش مستثنا می‌کند؛ تشخیص‌های مدل، حقیقت آناتومیک نیستند. این ابزار مدل موی جدید تولید نمی‌کند و برای ارائهٔ نتیجهٔ نهایی به مشتری تأیید نشده است.</p>
 <div class="steps"><span class="step">۱. تصویر</span><span class="step">۲. تشخیص و بررسی ماسک</span><span class="step">۳. بازسازی محلی</span></div>
 <section class="panel"><h2>۱. عکس آزمایشی یا تصویر شما</h2>
 <div class="actions"><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" aria-label="انتخاب عکس">
@@ -28,6 +28,8 @@
 <p id="status" role="status" aria-live="polite">یک تصویر محلی برای شروع انتخاب کنید.</p><pre id="metrics">Offline mode · no portrait upload · commercial release NOT approved</pre></section>
 </main><script src="../../data/pack-01.js"></script><script src="./ort/ort.min.js"></script><script type="module">
 import {getLocalHairSegmenter} from '../hair-segmenter.mjs';
+import {getLocalMulticlassSegmenter} from '../offhair-multiclass-baseline.mjs';
+import {createSemanticSkinVeto} from './semantic-skin-veto.mjs';
 import {prepareHairRemoval,composeInpaintedRGBA} from './hair-removal-core.mjs';
 const S=512,N=S*S,$=id=>document.getElementById(id);
 let imageData=null,proposal=null,token=0,sessionPromise=null;
@@ -53,9 +55,11 @@ async function prepareOffline(){
   const manifestResponse=await fetch('./model-manifest.json');
   if(!manifestResponse.ok)throw Error('Model manifest unavailable');
   const manifest=await manifestResponse.json();
-  const assets=['./hair-removal-studio.html','./hair-removal-core.mjs','./ort/ort.min.js',
+  const assets=['./hair-removal-studio.html','./hair-removal-core.mjs',
+   './semantic-skin-veto.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
    '../models/hair_segmenter.tflite','../models/blaze_face_short_range.tflite',
+   '../models/selfie_multiclass_256x256.tflite',
    '../wasm/vision_wasm_internal.js','../wasm/vision_wasm_internal.wasm',
    '../wasm/vision_wasm_nosimd_internal.js','../wasm/vision_wasm_nosimd_internal.wasm',
    ...manifest.parts.map(p=>'./parts/'+p.name),
@@ -106,13 +110,18 @@ async function analyze(){
  if(!imageData)return;
  const key=token;$('analyze').disabled=true;dropResult();status('مدل تشخیص موی کاملاً محلی در حال اجرا است...');
  try{
-  const engine=await getLocalHairSegmenter();
+  const [engine,semanticEngine]=await Promise.all([
+   getLocalHairSegmenter(),getLocalMulticlassSegmenter()]);
   const analysis=engine.analyze(originalCanvas);
+  const semantic=semanticEngine.analyze(originalCanvas);
   if(key!==token)return;
   if(!analysis.mask)throw Error('مدل مو را با اطمینان کافی تشخیص نداد.');
   const c=document.createElement('canvas');c.width=c.height=S;
   const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(analysis.mask,0,0,S,S);
-  const result=prepareHairRemoval(ctx.getImageData(0,0,S,S).data,S,S,analysis.face);
+  const veto=createSemanticSkinVeto(semantic.labels,semantic.width,semantic.height,S,S);
+  if(!veto.ok)throw Error('محافظت از پوست قابل اطمینان نیست: '+veto.reason);
+  const result=prepareHairRemoval(ctx.getImageData(0,0,S,S).data,S,S,
+   analysis.face,{semanticVeto:veto});
   if(!result.ok)throw Error('پردازش ایمن نیست: '+result.reason);
   proposal=result;
   const copy=new ImageData(new Uint8ClampedArray(imageData.data),S,S);
@@ -121,7 +130,12 @@ async function analyze(){
   }
   maskCanvas.getContext('2d').putImageData(copy,0,0);
   $('approve').disabled=false;status('ماسک پیشنهاد شد. پیش از ادامه قسمت قرمز و حفاظت از صورت را بررسی کنید.');
-  $('metrics').textContent=JSON.stringify({hairPixels:result.hairPixels,coveragePercent:+(result.areaFraction*100).toFixed(2),protectedPixels:result.protectedPixels,faceAnchored:true,remoteRequests:0},null,2);
+  $('metrics').textContent=JSON.stringify({hairPixels:result.hairPixels,coveragePercent:+(result.areaFraction*100).toFixed(2),protectedPixels:result.protectedPixels,faceAnchored:true,
+   semanticGuardApplied:result.semanticGuardApplied,
+   semanticConflicts:result.semanticConflicts,
+   predictedFaceSkinFraction:veto.semanticFaceFraction,
+   pretrainedSemanticModel:'MediaPipe SelfieMulticlass Apache-2.0',
+   independentAnatomicalGroundTruth:false,remoteRequests:0},null,2);
  }catch(error){proposal=null;status(String(error.message||error),true);}
  finally{if(key===token)$('analyze').disabled=false;}
 }
@@ -180,6 +194,9 @@ async function inpaint(){
     outsideMaskChangedPixels,
     inferenceMs:Math.round(performance.now()-t),totalMs:Math.round(performance.now()-start),
     faceOutsideMaskPreserved:true,crossOriginIsolated:self.crossOriginIsolated,
+    semanticGuardApplied:proposal.semanticGuardApplied,
+    semanticConflicts:proposal.semanticConflicts,
+    predictedFaceSkinFraction:proposal.semanticFaceFraction,
     model:'MI-GAN 512',privacy:'no customer image uploaded'};
   $('metrics').textContent=JSON.stringify(proof,null,2);
   window.__hananehHairStage=proof;

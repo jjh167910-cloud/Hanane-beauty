@@ -70,6 +70,7 @@ try{
  assert.equal(result.realInpainting,true);
  assert.equal(result.generatedHair,false);
  assert.equal(result.semanticGuardApplied,true,'Real pretrained semantic protection must execute');
+ assert.equal(result.faceLandmarkGuardApplied,true,'Observed facial feature regions must be protected');
  assert.ok(Number.isFinite(result.predictedFaceSkinFraction)&&result.predictedFaceSkinFraction>0,
   'Real face-skin prediction must be measured');
  assert.ok(result.semanticConflicts>=0,'Skin guard disagreement count must be recorded');
@@ -99,6 +100,7 @@ try{
   const {getLocalHairSegmenter}=await import('/ai/hair-segmenter.mjs');
   const {getLocalMulticlassSegmenter}=await import('/ai/offhair-multiclass-baseline.mjs');
   const {createSemanticSkinVeto}=await import('/ai/migan/semantic-skin-veto.mjs');
+  const {makeLandmarkFaceZones}=await import('/ai/offhair-face-zones.mjs');
   const {prepareHairRemoval}=await import('/ai/migan/hair-removal-core.mjs');
   const {composeReferenceHairResearch}=await import('/ai/migan/reference-transfer-research.mjs');
   const W=512, H=512;
@@ -116,7 +118,10 @@ try{
   const m=multiEngine.analyze(sourceCanvas);
   const veto=createSemanticSkinVeto(m.labels,m.width,m.height,W,H);
   if(!veto.ok)throw Error('Reference study cannot obtain semantic safety veto');
-  const prepared=prepareHairRemoval(sourceHairRGBA,W,H,sourceDetection.face,{semanticVeto:veto});
+  const anatomical=makeLandmarkFaceZones(sourceDetection.face,W,H);
+  if(!anatomical.ok)throw Error('Reference study lacks facial landmark protection');
+  const prepared=prepareHairRemoval(sourceHairRGBA,W,H,sourceDetection.face,
+   {semanticVeto:veto,faceZones:anatomical.zones});
   if(!prepared.ok)throw Error('Reference study cannot regenerate exact source removal mask');
   const out=[];
   let shown=false;
@@ -246,6 +251,7 @@ try{
  assert.ok(!result.error,'Offline repeat: '+result.error);
  assert.equal(result.realInpainting,true);assert.equal(result.realSegmentation,true);
  assert.equal(result.semanticGuardApplied,true,'Airplane mode must retain the real semantic veto');
+ assert.equal(result.faceLandmarkGuardApplied,true,'Airplane mode must retain facial feature protection');
  assert.ok(Number.isFinite(result.predictedFaceSkinFraction));
  assert.equal(result.outsideMaskChangedPixels,0,'Airplane-mode reconstruction must not alter protected pixels');
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);

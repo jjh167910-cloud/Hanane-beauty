@@ -313,12 +313,36 @@ try{
   await page.screenshot({path:path.join(root,'ai/migan/reference-transfer-evidence.png'),fullPage:true});
  }
 
+ // Phase 28: browser-generated ANONYMOUS performance evidence is downloaded
+ // only through a user click, with NO images, landmarks or personal file data.
+ assert.equal(await page.locator('#deviceEvidence').isEnabled(),true);
+ const [deviceDownload]=await Promise.all([
+  page.waitForEvent('download'),
+  page.locator('#deviceEvidence').click()
+ ]);
+ assert.equal(deviceDownload.suggestedFilename(),'hananeh-anonymous-device-evidence.json');
+ const deviceEvidence=JSON.parse(await fs.readFile(await deviceDownload.path(),'utf8'));
+ assert.equal(deviceEvidence.ok,true);
+ assert.equal(deviceEvidence.commercialReleaseAllowed,false);
+ assert.equal(deviceEvidence.measurement.neuralInpaintingMs,result.inferenceMs);
+ assert.equal(deviceEvidence.referencePreview.completed,true);
+ assert.equal(deviceEvidence.credibility.photoContentExcluded,true);
+ const deviceString=JSON.stringify(deviceEvidence);
+ for(const bad of ['data:image','base64,','rgba','faceAnchor','eyeX',
+  'sample_id','userAgent','portrait','filename','photoCode']){
+  assert.equal(deviceString.includes(bad),false,'Anonymous field export leaked '+bad);
+ }
+ console.log('PHASE28 ANONYMOUS BROWSER PERFORMANCE EXPORT PASSED '+JSON.stringify({
+  exportedBytes:deviceString.length,photoContentExcluded:true,verifiedGenerator:false,
+  commercialReleaseAllowed:false}));
  // Withdrawal must remove export permission and discard any previous proof.
  await page.locator('#approve').uncheck();
  assert.equal(await page.locator('#download').isDisabled(),true,
   'Revoked approval must disable previous neural output export');
  assert.equal(await page.evaluate(()=>window.__hananehHairStage),null,
   'Revoked approval must delete prior evidence from page state');
+ assert.equal(await page.locator('#deviceEvidence').isDisabled(),true,
+  'Revoked approval must disable performance evidence download');
  await page.locator('#approve').check();
  assert.equal(await page.locator('#run').isEnabled(),true,
   'Consent reapproval may begin a new independent inference');

@@ -67,6 +67,7 @@ import {createSemanticSkinVeto} from './semantic-skin-veto.mjs';
 import {composeReferenceHairResearch} from './reference-transfer-research.mjs';
 import {inspectLocalReferencePair} from './local-reference-pair.mjs';
 import {refineReferenceHairEdgeResearch} from './hair-boundary-refinement.mjs';
+import {auditHairEdgeRetention} from './hair-retention-risk.mjs';
 import {planTargetAwareRemoval} from './target-aware-repair.mjs';
 import {createOfflineDeviceEvidence} from './device-evidence.mjs';
 import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
@@ -121,7 +122,7 @@ async function prepareOffline(){
    './semantic-skin-veto.mjs','./reference-transfer-research.mjs',
    './target-aware-repair.mjs','./device-evidence.mjs',
    './landmark-hair-warp.mjs','./local-reference-pair.mjs',
-   './hair-boundary-refinement.mjs',
+   './hair-boundary-refinement.mjs','./hair-retention-risk.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
    '../models/hair_segmenter.tflite','../models/blaze_face_short_range.tflite',
@@ -369,6 +370,14 @@ $('softHairEdge').addEventListener('click',()=>{
   });
   if(!experiment.ok||experiment.exportAllowed!==false)
    throw Error('آزمایش لبه رد شد: '+experiment.reason);
+  const risk=auditHairEdgeRetention({
+   baseline:base,variant:experiment,restoredRGBA:restored,
+   sourceHairRGBA:reviewSource.sourceHairRGBA,
+   keepMask:proposal.keepMask,semanticVeto:reviewSource.semanticVeto,
+   faceZones:zone.zones,width:S,height:S
+  });
+  if(!risk.ok||risk.exportAllowed!==false)
+   throw Error('بررسی محافظت و کاهش پوشش مو رد شد: '+risk.reason);
   const previous=$('transferPortrait').getContext('2d').getImageData(0,0,S,S).data;
   let actualDiff=0;
   for(let i=0;i<N;i++){
@@ -386,11 +395,17 @@ $('softHairEdge').addEventListener('click',()=>{
   report.changedPixels=actualDiff;
   report.counts=experiment.counts;
   report.boundaryProxy=experiment.measures;
+  report.retentionRisk={
+   proxyCheckPassed:risk.proxyCheckPassed,
+   warnings:risk.warnings,metrics:risk.metrics,
+   humanHairQualityVerified:false,exportAllowed:false
+  };
   report.diagnosticFlags=experiment.diagnosticFlags;
   report.independentHairQualityScore=null;
   report.faceProtectionApplied=true;
-  $('transferStatus').textContent=
-   'آزمایش لبهٔ نرم اجرا شد؛ این شاخص صرفاً اختلاف پیکسل است، نه تأیید زیبایی نتیجه.';
+  $('transferStatus').textContent=risk.proxyCheckPassed?
+   'مقایسهٔ لبهٔ مو انجام شد؛ پوشش مو از بررسی اولیه گذشت، اما زیبایی و کیفیت چهره تأیید نشده است.':
+   'هشدار پژوهشی: نرم‌سازی لبه ممکن است مو را کم کند یا پوست بازسازی‌شده را نشان دهد؛ این تصویر فقط برای مقایسه است.';
  }catch(err){
   clearCanvas($('softEdgePortrait'));
   report.reason=String(err.message||err);

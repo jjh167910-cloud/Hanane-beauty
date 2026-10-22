@@ -34,7 +34,13 @@
 </select><button class="btn" id="previewTransfer" disabled>نمایش پیش‌نمایش پژوهشی</button></div>
 <div class="split"><div class="viewer"><div class="lbl">مدل موی مرجع</div><canvas id="referencePortrait" width="512" height="512"></canvas></div>
 <div class="viewer"><div class="lbl">ترکیب آزمایشی؛ کیفیت آرایشگاهی تأیید نشده</div><canvas id="transferPortrait" width="512" height="512"></canvas></div></div>
-<div class="actions"><button type="button" class="btn soft" id="targetAware" disabled>مقایسه بازسازی هدفمند (پژوهشی)</button></div>
+<div class="actions">
+ <button type="button" class="btn soft" id="targetAware" disabled>مقایسه بازسازی هدفمند (پژوهشی)</button>
+ <button type="button" class="btn soft" id="landmarkWarp" disabled>انطباق مدل مو با نقاط چهره</button>
+</div>
+<div class="viewer"><div class="lbl">انتقال مدل موی شش‌نقطه‌ای — صرفاً آزمایشی</div>
+<canvas id="landmarkPortrait" width="512" height="512"></canvas></div>
+<pre id="landmarkMetrics">No nonrigid geometry approval · no export</pre>
 <div class="viewer"><div class="lbl">بازسازی هدفمند زیر مدل مو — آزمایشی و غیرقابل دانلود</div>
 <canvas id="targetAwarePortrait" width="512" height="512"></canvas></div>
 <pre id="targetMetrics">No approved photorealistic hair generation</pre>
@@ -60,6 +66,9 @@ const clearCanvas=c=>{const x=c.getContext('2d');x.clearRect(0,0,S,S);x.fillStyl
 function status(t,error=false){$('status').textContent=t;$('status').className=error?'error':'';}
 function clearTransfer(){
  transferToken++;lastTransferReference=null;
+ $('landmarkWarp').disabled=true;
+ clearCanvas($('landmarkPortrait'));window.__hananehLandmarkStage=null;
+ $('landmarkMetrics').textContent='No nonrigid geometry approval · no export';
  $('targetAware').disabled=true;clearCanvas($('targetAwarePortrait'));
  window.__hananehTargetAwareStage=null;
  $('targetMetrics').textContent='No approved photorealistic hair generation';
@@ -90,6 +99,7 @@ async function prepareOffline(){
   const assets=['./hair-removal-studio.html','./hair-removal-core.mjs',
    './semantic-skin-veto.mjs','./reference-transfer-research.mjs',
    './target-aware-repair.mjs','./device-evidence.mjs',
+   './landmark-hair-warp.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
    '../models/hair_segmenter.tflite','../models/blaze_face_short_range.tflite',
@@ -264,6 +274,52 @@ async function inpaint(){
  finally{if(key===token)$('run').disabled=!(proposal&&$('approve').checked);}
 }
 $('run').addEventListener('click',inpaint);
+$('landmarkWarp').addEventListener('click',()=>{
+ if(!lastTransferReference||!imageData||!proposal||!reviewSource||
+  !window.__hananehTransferStage?.ok||!$('approve').checked)return;
+ $('landmarkWarp').disabled=true;
+ const evidence={
+  ok:false,previewOnly:true,exportAllowed:false,
+  referenceHairstyleGenerated:false,realisticHairTransferVerified:false};
+ try{
+  const result=composeReferenceHairResearch({
+   sourceRGBA:imageData.data,
+   restoredRGBA:afterCanvas.getContext('2d').getImageData(0,0,S,S).data,
+   sourceHairRGBA:reviewSource.sourceHairRGBA,
+   referenceRGBA:lastTransferReference.rgba,
+   referenceHairRGBA:lastTransferReference.hair,
+   keepMask:proposal.keepMask,semanticVeto:reviewSource.semanticVeto,
+   sourceFace:reviewSource.face,referenceFace:lastTransferReference.face,
+   alignmentMode:'bounded-landmark',width:S,height:S
+  });
+  if(!result.ok)throw Error(result.reason);
+  if(result.exportAllowed!==false||result.referenceHairstyleGenerated!==false)
+   throw Error('Unapproved geometry cannot become customer output');
+  $('landmarkPortrait').getContext('2d').putImageData(
+   new ImageData(result.rgba,S,S),0,0);
+  evidence.ok=true;
+  evidence.geometry=result.measures.landmarkAlignment;
+  evidence.diagnosticFlags=result.diagnosticFlags;
+  let differences=0;
+  const baseline=$('transferPortrait').getContext('2d').getImageData(0,0,S,S).data;
+  for(let i=0;i<N;i++){
+   const k=i*4;
+   if(result.rgba[k]!==baseline[k]||result.rgba[k+1]!==baseline[k+1]||
+      result.rgba[k+2]!==baseline[k+2])differences++;
+  }
+  evidence.comparisonChangedPixels=differences;
+  evidence.independentVisualQualityRating=null;
+  evidence.pixelIdentityPreservedOutsideProtectedEdits=true;
+  $('transferStatus').textContent='انطباق چهره در مدل آزمایشی انجام شد؛ کیفیت ظاهری هنوز تأیید نشده است.';
+ }catch(err){
+  clearCanvas($('landmarkPortrait'));
+  evidence.reason=String(err.message||err);
+  $('transferStatus').textContent='انطباق غیرصلب رد شد: '+evidence.reason;
+ }
+ window.__hananehLandmarkStage=evidence;
+ $('landmarkMetrics').textContent=JSON.stringify(evidence,null,2);
+ $('landmarkWarp').disabled=!(window.__hananehTransferStage?.ok&&$('approve').checked);
+});
 $('targetAware').addEventListener('click',async()=>{
  if(!lastTransferReference||!imageData||!proposal||!reviewSource||
   !window.__hananehTransferStage?.ok||!$('approve').checked)return;
@@ -419,6 +475,7 @@ $('previewTransfer').addEventListener('click',async()=>{
    generatedNewHair:false,counts:result.counts,measures:result.measures,
    diagnosticFlags:result.diagnosticFlags};
   window.__hananehTransferStage=metadata;
+  $('landmarkWarp').disabled=false;
   lastTransferReference={face:detection.face,
    rgba:ctx.getImageData(0,0,S,S).data,
    hair:mask.getContext('2d').getImageData(0,0,S,S).data};

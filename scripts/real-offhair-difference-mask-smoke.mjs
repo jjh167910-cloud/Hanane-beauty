@@ -42,12 +42,14 @@ try{
  await page.reload({waitUntil:'load'});
  const measure=async()=>{
   const {getLocalHairSegmenter}=await import('/ai/hair-segmenter.mjs');
+  const {getLocalMulticlassSegmenter,compareHairModelMasks}=await import('/ai/offhair-multiclass-baseline.mjs');
   const {differenceMaskStudy,mapTopologyToRGBA}=await import('/ai/offhair-difference-masks.mjs');
   const {observationFromFaceAnchor,transferSupportMask,gateTargetSupport}=await import('/ai/offhair-pose-flow.mjs');
   const {makeLandmarkFaceZones}=await import('/ai/offhair-face-zones.mjs');
   const {studyLandmarkStability}=await import('/ai/offhair-landmark-stability.mjs');
   const learnedWeights=await (await fetch('/ai/models/offhair-synthetic-pose-flow-v1.json')).json();
-  const engine=await getLocalHairSegmenter(),dim=512;
+  const engine=await getLocalHairSegmenter(),
+   semanticEngine=await getLocalMulticlassSegmenter(),dim=512;
   const ids=['1','2','3','6','9'],observations={};
   for(const id of ids){
    const source=window.OFFLINE_IMAGES?.[id];
@@ -60,11 +62,17 @@ try{
    x.drawImage(img,(dim-img.naturalWidth*scale)/2,(dim-img.naturalHeight*scale)/2,
     img.naturalWidth*scale,img.naturalHeight*scale);
    const detection=engine.analyze(c);
-   observations[id]={valid:!!(detection.mask&&detection.face),face:detection.face};
+   const semantics=semanticEngine.analyze(c);
+   observations[id]={valid:!!(detection.mask&&detection.face),face:detection.face,
+    semantic:{classCounts:semantics.counts,faceSkinFraction:semantics.faceSkinFraction,
+      size:[semantics.width,semantics.height],crossModel:null}};
    if(detection.mask){
     const c2=document.createElement('canvas');c2.width=c2.height=dim;
     const ctx=c2.getContext('2d');ctx.drawImage(detection.mask,0,0,dim,dim);
     observations[id].mask=ctx.getImageData(0,0,dim,dim).data;
+    observations[id].semantic.crossModel=compareHairModelMasks(
+     semantics.labels,semantics.width,semantics.height,
+     observations[id].mask,dim,dim);
    }
   }
   // Measure sensitivity on every available independently segmented source photo.
@@ -173,10 +181,20 @@ try{
     referenceHairstyleGenerated:dm.referenceHairstyleGenerated};
   });
   return {observed:ids.map(id=>({id,hasRealMask:!!observations[id]?.mask,
-   hasFace:!!observations[id]?.face})),faceStability,evaluations,
+   hasFace:!!observations[id]?.face,semantic:observations[id]?.semantic})),
+    faceStability,evaluations,
    method:'2d_eye_anchor_proxy_topology',generatedHairstyles:0,photographicQualityVerified:false};
  };
  const first=await page.evaluate(measure);
+ assert.equal(first.observed.filter(x=>x.semantic?.classCounts?.length===6).length,5,
+  'All bundled portraits must execute the genuine Apache-2.0 six-class model');
+ for(const item of first.observed){
+  const m=item.semantic;
+  assert.ok(m,'No multiclass prediction for '+item.id);
+  assert.equal(m.classCounts.reduce((a,b)=>a+b,0),m.size[0]*m.size[1]);
+  assert.equal(m.crossModel?.usableForAutomaticEditing,false);
+  assert.equal(m.crossModel?.hasIndependentGroundTruth,false);
+ }
  assert.ok(first.observed.filter(x=>x.hasRealMask&&x.hasFace).length>=3,
   'Insufficient genuine catalog masks and landmarks');
  assert.ok(first.evaluations.filter(x=>x.counts).length>=3,
@@ -213,7 +231,11 @@ try{
   first};
  await fs.writeFile(path.join(root,'ai/offhair-dm/topology-ci-evidence.json'),JSON.stringify(evidence,null,2)+'\n');
  console.log('REAL OFFHAIR DIFFERENCE-MASK TOPOLOGY AND OFFLINE RELOAD PASSED '+JSON.stringify({
-  analyzed: first.observed.length,faceStability:first.faceStability,
+  analyzed: first.observed.length,semanticComparisons:first.observed.map(x=>({
+   id:x.id,hairIoU:x.semantic?.crossModel?.crossModelHairIoU,
+   skinConflictFraction:x.semantic?.crossModel?.skinConflictFractionOfOriginalHair,
+   faceSkinPixels:x.semantic?.classCounts?.[3],verifiedGroundTruth:false})),
+   faceStability:first.faceStability,
   measurable:first.evaluations.filter(x=>x.counts).length,
   accepted:first.evaluations.filter(x=>x.accepted).length,rejected:first.evaluations.filter(x=>!x.accepted).length,
   rollAccepted:first.evaluations.filter(x=>x.rollAblation?.accepted).length,

@@ -118,3 +118,43 @@ measure latency on a physical Samsung/Android device.
 with independently acquired, legally cleared, actual photographic
 hair-alpha labels.** Do not merge into commercial main while the
 artificial cutout hairline remains uncorrected.
+
+
+## Actual Phase 42 measured browser results and safety tightening
+
+**First complete GitHub Actions run PASS:** commit
+`9352ce90c80e6179e2fbfd0bc7bd4bf8400be2de`:
+https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39826367302
+
+The real local hair-segmentation, MI-GAN and MODNet browser
+inference operated while the new alpha-label evaluation was exercised
+through its file input using a **computer-generated, geometrically
+misregistered** grayscale PNG. The new local evaluator computed the
+existing Phase40 coverage of **0.3458879829847572** (3,903/11,284)
+and identified **64,733** simulated ground-truth hair/face-protected
+pixel conflicts. The identical metrics reproduced after browser
+networking was disabled. The fixture generated **zero actual
+independent human alpha ground-truth observations**.
+
+**Adversarial fail-closed follow-up:** the subsequent research code
+now sets `maskPlausibilityReviewRequired:true` whenever a provided
+mask shows broad hair-label conflict with protected face or the
+definite background. It sets
+`scoreUsableAsHairQualityEvidence:false` unconditionally,
+because no local PNG/checkbox proves human annotation independence,
+rights or source alignment. The Persian UI explicitly warns that the
+deliberately malformed example is unusable for quality claims.
+A single legitimate thin strand crossing part of the forehead only
+increments a conflict count and is not categorically erased. The
+same guard is covered by new synthetic unit and browser tests.
+
+**Interpretation:** The original benchmark was a valuable
+instrumentation result but is not an authentic photographic
+hair-alpha measurement. The 64,733-pixel conflict is a property
+of the deliberately false test-mask geometry, not a real person's
+hairline. An independent, rights-cleared aligned hair-alpha mask
+has NOT been measured. Local model-generated outputs and
+checkbox attestations cannot serve as independent labels.
+
+The exact last guard commit must complete a full GitHub CI run
+before the new severe-disagreement warning is declared verified.

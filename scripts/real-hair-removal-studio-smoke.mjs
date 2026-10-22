@@ -299,6 +299,24 @@ try{
  assert.equal(uiTransfer.previewOnly,true);
  assert.equal(uiTransfer.exportAllowed,false);
  assert.equal(uiTransfer.generatedNewHair,false);
+ await page.locator('#softHairEdge').click();
+ const liveEdge=await page.evaluate(()=>window.__hananehEdgeStage);
+ assert.ok(liveEdge,'Research inner-edge experiment did not run');
+ assert.equal(liveEdge.ok,true,'Real image edge experiment refused: '+liveEdge.reason);
+ assert.equal(liveEdge.exportAllowed,false);
+ assert.equal(liveEdge.photorealismVerified,false);
+ assert.equal(liveEdge.referenceHairstyleGenerated,false);
+ assert.equal(liveEdge.independentHairQualityScore,null);
+ assert.ok(liveEdge.changedPixels>0);
+ assert.ok(liveEdge.counts.softenedPixels>0);
+ assert.ok(liveEdge.counts.boundaryPairs>0);
+ console.log('PHASE31 REAL HAIR CUTOUT INNER-EDGE ABLATION '+JSON.stringify({
+  changedPixels:liveEdge.changedPixels,
+  softenedPixels:liveEdge.counts.softenedPixels,
+  seamJumpBefore:liveEdge.boundaryProxy.boundaryMeanRGBJumpBefore,
+  seamJumpAfter:liveEdge.boundaryProxy.boundaryMeanRGBJumpAfter,
+  noProtectedEdits:liveEdge.faceProtectionApplied,
+  qualityHumanVerified:false,commercialExportAllowed:false}));
  // Phase 29: real MediaPipe six-landmark fitting is an optional research
  // comparison; missing ear/nose landmarks must fail safely, not be invented.
  await page.locator('#landmarkWarp').click();
@@ -380,6 +398,11 @@ try{
  assert.equal(localPhotoPreview.differentPersonVerified,false);
  assert.equal(localPhotoPreview.referenceRightsIndependentlyVerified,false);
  assert.equal(localPhotoPreview.exportAllowed,false);
+ await page.locator('#softHairEdge').click();
+ const localEdge=await page.evaluate(()=>window.__hananehEdgeStage);
+ assert.equal(localEdge.ok,true,'User-local reference failed edge A/B: '+localEdge.reason);
+ assert.equal(localEdge.exportAllowed,false);
+ assert.ok(localEdge.changedPixels>0);
  await page.locator('#landmarkWarp').click();
  const localWarp=await page.evaluate(()=>window.__hananehLandmarkStage);
  assert.ok(localWarp,'Uploaded-photo warp must either succeed or explicitly refuse');
@@ -392,6 +415,9 @@ try{
  assert.equal(await page.locator('#referencePhoto').inputValue(),'');
  assert.equal(await page.evaluate(()=>window.__hananehTransferStage),null);
  assert.equal(await page.locator('#landmarkWarp').isDisabled(),true);
+ assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
+ assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null,
+  'Revoked reference permission must discard prior matting result');
  await page.locator('#referenceSample').selectOption(eligible.id);
  await page.locator('#previewTransfer').click();
  await page.waitForFunction(()=>window.__hananehTransferStage!==null,{timeout:60000});
@@ -410,6 +436,8 @@ try{
   'Revoked consent must disable geometry research');
  assert.equal(await page.evaluate(()=>window.__hananehLandmarkStage),null,
   'Revoked consent must erase previous facial landmark fit diagnostics');
+ assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
+ assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null);
  assert.equal(await page.locator('#deviceEvidence').isDisabled(),true,
   'Revoked approval must disable performance evidence download');
  await page.locator('#approve').check();
@@ -461,6 +489,15 @@ try{
   'Protected transfer pixel counts must match across online and offline inference');
  assert.deepEqual(offlinePreview.diagnosticFlags,uiTransfer.diagnosticFlags,
   'Offline reload must not conceal the same visual failure warnings');
+ await page.locator('#softHairEdge').click();
+ const offlineEdge=await page.evaluate(()=>window.__hananehEdgeStage);
+ assert.equal(offlineEdge.ok,true,
+  'Matting must be reproducible with full network disabled: '+offlineEdge.reason);
+ assert.equal(offlineEdge.changedPixels,liveEdge.changedPixels);
+ assert.deepEqual(offlineEdge.boundaryProxy,liveEdge.boundaryProxy);
+ assert.equal(offlineEdge.exportAllowed,false);
+ console.log('PHASE31 AIRPLANE MODE BOUNDARY ABLATION '+JSON.stringify({
+  sameChangedPixelCount:true,sameProxy:true,commercialExportAllowed:false}));
  await page.locator('#landmarkWarp').click();
  const offlineWarp=await page.evaluate(()=>window.__hananehLandmarkStage);
  assert.ok(offlineWarp,'Six-anchor result must exist on airplane-mode repeat');
@@ -516,6 +553,12 @@ try{
  assert.equal(offlineLocalPreview.referenceFromLocalFile,true);
  assert.equal(offlineLocalPreview.exportAllowed,false);
  assert.equal(offlineLocalPreview.differentPersonVerified,false);
+ await page.locator('#softHairEdge').click();
+ const offlineLocalEdge=await page.evaluate(()=>window.__hananehEdgeStage);
+ assert.equal(offlineLocalEdge.ok,true,'Offline local photo matting failed: '+offlineLocalEdge.reason);
+ assert.equal(offlineLocalEdge.changedPixels,localEdge.changedPixels);
+ assert.deepEqual(offlineLocalEdge.boundaryProxy,localEdge.boundaryProxy);
+ assert.equal(offlineLocalEdge.exportAllowed,false);
  assert.deepEqual(offlineLocalPreview.counts,localPhotoPreview.counts,
   'Online and offline file picker must yield the exact same counted hair pixels');
  await page.locator('#referenceConsent').uncheck();

@@ -38,7 +38,7 @@ function linearBlend(base,donor,alpha){
 export function composeReferenceHairResearch({
  sourceRGBA,restoredRGBA,sourceHairRGBA,referenceRGBA,referenceHairRGBA,
  keepMask,semanticVeto,sourceFace,referenceFace,width,height,
- threshold=178,maxScale=1.6,maxRoll=.25
+ threshold=178,maxScale=1.6,maxRoll=.25,allowNoInpainting=false
 }){
  const n=width*height;
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<32||
@@ -49,7 +49,8 @@ export function composeReferenceHairResearch({
   throw new TypeError('Invalid source, donor, mask or image dimensions');
  if(!Number.isInteger(threshold)||threshold<128||threshold>230||
   !finite(maxScale)||maxScale<1||maxScale>2||
-  !finite(maxRoll)||maxRoll<0||maxRoll>.5)
+  !finite(maxRoll)||maxRoll<0||maxRoll>.5||
+  typeof allowNoInpainting!=='boolean')
   throw new TypeError('Invalid research alignment settings');
  if(!faceOK(sourceFace)||!faceOK(referenceFace))
   return invalid('Two reliable eye anchors required');
@@ -83,7 +84,8 @@ export function composeReferenceHairResearch({
   if(sourceRGBA[k+3]!==restoredRGBA[k+3])
    return invalid('Upstream inpainting modified source transparency');
  }
- if(!removed||removed/n>.35)return invalid('Unsafe inpainting region');
+ if((!removed&&!allowNoInpainting)||removed/n>.35)
+  return invalid('Unsafe inpainting region');
  let donorHair=0,referenceClipped=0;
  const cos=Math.cos(delta),sin=Math.sin(delta);
  const sx=sourceFace.eyeX*width,sy=sourceFace.eyeY*height,
@@ -132,6 +134,7 @@ export function composeReferenceHairResearch({
  }
  const remainingFraction=sourceHair?residualSourceHair/sourceHair:null;
  const diagnosticFlags=[];
+ if(!removed)diagnosticFlags.push('all_original_hair_covered_by_opaque_donor_according_to_2d_proxy');
  if(remainingFraction===null)diagnosticFlags.push('missing_source_hair');
  else if(remainingFraction>.1)diagnosticFlags.push('visible_original_hair_risk');
  if(foreheadOverlaps>0)diagnosticFlags.push('fringe_occlusion_unresolved');

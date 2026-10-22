@@ -63,6 +63,7 @@ body.review-focus #humanReview{margin-top:0;min-height:calc(100vh - 28px)}
 <button type="button" class="btn soft" id="portraitMatte" disabled>آزمایش ماتینگ عصبی چهره و بدن (نه فقط مو)</button>
 <button type="button" class="btn soft" id="hairTrimap" disabled>ساخت سه‌ناحیه‌ای ماسک مو برای ماتینگ تخصصی</button>
 <button type="button" class="btn soft" id="colorlineAlpha" disabled>آزمایش تخمین آلفای مو از رنگ‌های مرجع (غیرعصبی)</button>
+<button type="button" class="btn soft" id="localAlphaFit" disabled>آزمون بازیابی محافظه‌کارانهٔ پیکسل‌های نامعلوم</button>
 </div>
 <div class="viewer"><div class="lbl">انتقال مدل موی شش‌نقطه‌ای — صرفاً آزمایشی</div>
 <canvas id="landmarkPortrait" width="512" height="512"></canvas></div>
@@ -88,6 +89,10 @@ body.review-focus #humanReview{margin-top:0;min-height:calc(100vh - 28px)}
 <div class="viewer"><div class="lbl">آلفای تخمینیِ مو — روشن=مو، تیره=پس‌زمینه، صورتی=امتناع به‌علت نبود شواهد</div>
 <canvas id="colorlineAlphaCanvas" width="512" height="512"></canvas></div>
 <pre id="colorlineAlphaMetrics">No fitted hair alpha yet. No licensed neural hair matte loaded.</pre>
+<div class="viewer"><div class="lbl">بازیابی مشروط: فیروزه‌ای=تخمین جدید، صورتی=هنوز نامعلوم، خاکستری=تخمین قبلی</div>
+<canvas id="localAlphaFitCanvas" width="512" height="512"></canvas></div>
+<pre id="localAlphaFitMetrics">No local regression attempted · original color-line output remains unchanged.</pre>
+<p class="aside">افزایش تعداد پیکسل‌های تخمین‌زده‌شده دلیل کیفیت واقعی مو نیست. این ابزار از دادهٔ ِ مورد تأیید قبلی فقط یک مرتبه استفاده می‌کند و به پوست محافظت‌شده دست نمی‌زند.</p>
 <div class="panel" style="margin-top:14px;box-shadow:none">
 <h2>ارزیابی آلفای مو با برچسب مستقل — فقط روی دستگاه</h2>
 <p class="aside">برچسب PNG باید ۵۱۲×۵۱۲ و سیاه‌وسفید باشد؛ سفید یعنی موی کامل، سیاه یعنی بدون مو و خاکستری یعنی پوشش کسری تارهای مو. عکس و برچسب باید دقیقاً پیکسل‌به‌پیکسل منطبق باشند. ماسک جداکنندهٔ قبلی یا خروجی همین الگوریتم، حقیقت مرجع مستقل نیست.</p>
@@ -150,6 +155,7 @@ import {restoreDonorHairlineDetailResearch} from './hairline-microtexture-resear
 import {runPortraitMatteOnDevice} from './portrait-modnet-neural-audit.mjs';
 import {makeGuardedHairTrimap} from './guarded-hair-trimap.mjs';
 import {inferGuardedHairAlphaColorLine} from './hair-alpha-colorline-research.mjs';
+import {refineGuardedHairAlphaLocalRGB} from './hair-alpha-local-regression.mjs';
 import {readOpaqueGrayHairAlpha,assessLocalHairAlphaLabel} from './hair-alpha-local-groundtruth.mjs';
 import {estimateBoundedReferenceForeground} from './reference-foreground-color-research.mjs';
 import {locateForeheadCutoutRisk} from './hairline-hotspot-audit.mjs';
@@ -183,6 +189,12 @@ function clearBlindReview(){
  $('reviewStatus').textContent='بازبینی با تغییر عکس یا رضایت حذف شد.';
  window.__hananehBlindReviewStage=null;
 }
+function clearLocalAlphaFit(){
+ $('localAlphaFit').disabled=true;
+ window.__hananehLocalAlphaFitStage=null;
+ clearCanvas($('localAlphaFitCanvas'));
+ $('localAlphaFitMetrics').textContent='No local regression attempted · original color-line output remains unchanged.';
+}
 function clearGroundTruthAudit(){
  $('runHairTruth').disabled=true;
  $('localHairTruth').disabled=true;
@@ -193,6 +205,7 @@ function clearGroundTruthAudit(){
  $('localTruthMetrics').textContent='No independently verified hair alpha annotation loaded; no real-world MAE claimed.';
 }
 function clearTransfer(){
+ clearLocalAlphaFit();
  clearGroundTruthAudit();
  lastAlphaPrediction=null;
  clearBlindReview();
@@ -211,6 +224,7 @@ function clearTransfer(){
  $('portraitMatte').disabled=true;
  $('hairTrimap').disabled=true;
  $('colorlineAlpha').disabled=true;
+ clearLocalAlphaFit();
  lastHairTrimap=null;
  lastAlphaPrediction=null;
  clearGroundTruthAudit();
@@ -271,6 +285,7 @@ async function prepareOffline(){
    './reference-foreground-color-research.mjs',
    './portrait-modnet-neural-audit.mjs','./guarded-hair-trimap.mjs',
    './hair-alpha-colorline-research.mjs',
+   './hair-alpha-local-regression.mjs',
    './hair-alpha-local-groundtruth.mjs',
    './models/portrait-modnet-manifest.json',
    './models/portrait-modnet-fp16.onnx',
@@ -586,10 +601,51 @@ $('runHairTruth').addEventListener('click',async()=>{
  $('localHairTruth').value='';
  updateTruthButton();
 });
+$('localAlphaFit').addEventListener('click',()=>{
+ if(!imageData||!reviewSource||!lastHairTrimap?.ok||
+    !lastAlphaPrediction?.ok||!$('approve').checked)return;
+ $('localAlphaFit').disabled=true;
+ const report={ok:false,exportAllowed:false,previewOnly:true,
+  independentlyValidatedHairAlpha:false,photorealismVerified:false,
+  commercialReleaseAllowed:false};
+ try{
+  const zone=makeLandmarkFaceZones(reviewSource.face,S,S);
+  if(!zone.ok)throw Error('حفاظت چهره معتبر نیست');
+  const start=performance.now();
+  const result=refineGuardedHairAlphaLocalRGB({
+   sourceRGBA:imageData.data,
+   baseline:lastAlphaPrediction,trimap:lastHairTrimap,
+   semanticVeto:reviewSource.semanticVeto,faceZones:zone.zones,
+   width:S,height:S
+  });
+  if(!result.ok||result.exportAllowed!==false||
+     result.independentlyValidatedHairAlpha!==false)
+   throw Error(result.reason||'تخمین محلی نامعتبر است');
+  $('localAlphaFitCanvas').getContext('2d').putImageData(
+   new ImageData(result.diagnosticRGBA,S,S),0,0);
+  report.ok=true;report.metrics=result.metrics;
+  report.elapsedMs=Math.round(performance.now()-start);
+  report.baselineUnchanged=true;
+  report.protectedFacePixelsChanged=0;
+  report.realHairAlphaGroundTruthAvailable=false;
+  report.newStrandsGenerated=false;
+  $('transferStatus').textContent=result.metrics.newlyEstimatedPixels?
+   'پیکسل‌هایی با شواهد رنگی کافی به شکل آزمایشی تخمین زده شدند؛ این نتیجه هنوز صحت ظاهریِ تارهای مو را اثبات نمی‌کند.':
+   'هیچ پیکسل تازه‌ای با شواهد کافی بازیابی نشد؛ نتیجهٔ قبلی دست‌نخورده باقی مانده است.';
+ }catch(err){
+  clearCanvas($('localAlphaFitCanvas'));
+  report.reason=String(err.message||err);
+  $('transferStatus').textContent='آزمایش محلی آلفا رد شد: '+report.reason;
+ }
+ window.__hananehLocalAlphaFitStage=report;
+ $('localAlphaFitMetrics').textContent=JSON.stringify(report,null,2);
+ $('localAlphaFit').disabled=!(lastAlphaPrediction?.ok&&lastHairTrimap?.ok&&$('approve').checked);
+});
 $('colorlineAlpha').addEventListener('click',()=>{
  if(!imageData||!reviewSource||!lastHairTrimap?.ok||
    !window.__hananehHairTrimapStage?.ok||!$('approve').checked)return;
  $('colorlineAlpha').disabled=true;
+ clearLocalAlphaFit();
  lastAlphaPrediction=null;clearGroundTruthAudit();
  const report={ok:false,previewOnly:true,exportAllowed:false,
   neuralHairMattingExecuted:false,alphaGroundTruth:false,
@@ -611,6 +667,7 @@ $('colorlineAlpha').addEventListener('click',()=>{
    new ImageData(result.diagnosticRGBA,S,S),0,0);
   report.ok=true;
   lastAlphaPrediction=result;
+  $('localAlphaFit').disabled=false;
   $('localHairTruth').disabled=false;
   report.metrics=result.metrics;
   report.elapsedMs=Math.round(performance.now()-t0);

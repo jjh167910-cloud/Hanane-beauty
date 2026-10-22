@@ -86,6 +86,50 @@ try{
  await page.locator('#colorlineAlpha').click();
  const firstColorline=await page.evaluate(()=>window.__hananehColorlineAlphaStage);
  assert.equal(firstColorline.ok,true,'Real color-line hair alpha failed: '+firstColorline.reason);
+ // Deliberately synthetic mislabeled data: this tests ONLY file import,
+ // consent controls, error arithmetic and offline parity, not authentic
+ // independent photographic hair-alpha annotation.
+ const syntheticMaskPNG=Buffer.from((await page.evaluate(()=>{
+  const can=document.createElement('canvas');can.width=512;can.height=512;
+  const ctx=can.getContext('2d');const pixels=ctx.createImageData(512,512);
+  for(let y=0;y<512;y++)for(let x=0;x<512;x++){
+   const k=4*(y*512+x);
+   const v=Math.round(255*Math.max(0,Math.min(1,(295-x)/75)));
+   pixels.data.set([v,v,v,255],k);
+  }
+  ctx.putImageData(pixels,0,0);
+  return can.toDataURL('image/png').split(',')[1];
+ })), 'base64');
+ async function attachSyntheticLocalTruth(){
+  await page.locator('#localTruthConsent').check();
+  await page.locator('#localHairTruth').setInputFiles({
+   name:'synthetic-test-alpha.png',mimeType:'image/png',buffer:syntheticMaskPNG
+  });
+  assert.equal(await page.locator('#runHairTruth').isEnabled(),true);
+  await page.locator('#runHairTruth').click();
+  await page.waitForFunction(()=>window.__hananehLocalGroundTruthStage!==null);
+  const proof=await page.evaluate(()=>window.__hananehLocalGroundTruthStage);
+  assert.equal(proof.ok,true,proof.reason);
+  assert.equal(proof.photographicGroundTruthVerified,false);
+  assert.equal(proof.independentlyLabeledHairVerified,false);
+  assert.equal(proof.trueHairAlphaQualityCertified,false);
+  assert.equal(proof.rightsExternallyVerified,false);
+  assert.equal(proof.exportAllowed,false);
+  assert.equal(proof.commercialReleaseAllowed,false);
+  assert.equal(proof.metrics.unknownPixels,11284);
+  assert.equal(proof.metrics.unknownPixels,
+    proof.metrics.acceptedPixels+proof.metrics.abstainedPixels);
+  assert.equal(proof.metrics.coverageErrorBothReported,true);
+  assert.equal(await page.locator('#runHairTruth').isDisabled(),true);
+  return proof;
+ }
+ const localMaskTest=await attachSyntheticLocalTruth();
+ console.log('PHASE42 SYNTHETIC FILE IMPORT ONLY '+JSON.stringify({
+  fileIsComputerGenerated:true,realPhotographicHairAlphaValidated:false,
+  linkedSubjectIndependent:false,
+  coverage:localMaskTest.metrics.coverage,
+  protectedFaceLabelConflicts:localMaskTest.metrics.labelConflictsWithProtectedFacePixels,
+  privacyNoPhotosExported:true}));
  assert.equal(firstColorline.exportAllowed,false);
  assert.equal(firstColorline.alphaGroundTruth,false);
  assert.equal(firstColorline.neuralHairMattingExecuted,false);
@@ -643,6 +687,9 @@ try{
  assert.equal(await page.locator('#hairTrimap').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehColorlineAlphaStage),null,
   'Photo consent withdrawal must erase prior fractional hair-alpha results');
+ assert.equal(await page.evaluate(()=>window.__hananehLocalGroundTruthStage),null,
+  'Source/reference permission withdrawal must discard third-party masks and numbers');
+ assert.equal(await page.locator('#localHairTruth').isDisabled(),true);
  assert.equal(await page.locator('#colorlineAlpha').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehMicrotextureStage),null,
   'Revoked reference permission must erase all donor texture diagnostics');
@@ -703,6 +750,7 @@ try{
     '/ai/migan/portrait-modnet-neural-audit.mjs',
     '/ai/migan/guarded-hair-trimap.mjs',
     '/ai/migan/hair-alpha-colorline-research.mjs',
+    '/ai/migan/hair-alpha-local-groundtruth.mjs',
     ...manifest.parts.map(p=>'/ai/migan/parts/'+p.name)];
    return {files:files.length,present:await Promise.all(files.map(async p=>!!(await cache.match(p))))};
  });
@@ -729,6 +777,16 @@ try{
   'Classical hair opacity inference must run airplane mode: '+offlineColorline.reason);
  assert.deepEqual(offlineColorline.metrics,firstColorline.metrics,
   'Offline reloaded hair alpha must give exactly same supported/abstained counts');
+ const offlineLocalMask=await attachSyntheticLocalTruth();
+ assert.deepEqual(offlineLocalMask.metrics,localMaskTest.metrics,
+  'Same local simulated mask must compute identical error/abstention metrics with networking disabled');
+ assert.equal(offlineLocalMask.photographicGroundTruthVerified,false);
+ await page.locator('#clearHairTruth').click();
+ assert.equal(await page.evaluate(()=>window.__hananehLocalGroundTruthStage),null);
+ assert.equal(await page.locator('#localHairTruth').isDisabled(),true);
+ console.log('PHASE42 AIRPLANE MODE PRIVATE LABEL CHECK '+JSON.stringify({
+  syntheticFixtureOnly:true,stableMetrics:true,rightsNotExternallyVerified:true,
+  localMaskDisposedAfterTest:true,photoUploaded:false}));
  assert.equal(offlineColorline.exportAllowed,false);
  assert.equal(offlineColorline.neuralHairMattingExecuted,false);
  console.log('PHASE40 AIRPLANE MODE HAIR ALPHA STUDY '+JSON.stringify({

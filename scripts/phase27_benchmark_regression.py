@@ -74,7 +74,7 @@ class Phase27GateTests(unittest.TestCase):
         self.assertNotEqual(self.run_gate().returncode,0)
 
     def test_unconsented_third_color_reference_rejected(self):
-        blob=(b"\\xff\\xd8\\xff"+b"x"*5000)
+        blob=(b"\xff\xd8\xff"+b"x"*5000)
         name="unconsented-third.jpg"
         (self.data/name).write_bytes(blob)
         self.case["color_image"]={"path":name,

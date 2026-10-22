@@ -39,12 +39,14 @@ function boundaryProxy(rgba,opacity,width,height){
 /** Call only with the successful baseline result from composeReferenceHairResearch. */
 export function refineReferenceHairEdgeResearch({
  baseline,restoredRGBA,semanticVeto,faceZones,width,height,
+ sourceHairRGBA=null,keepMask=null,protectErasedHair=false,
  radius=3,strength=.52
 }){
  const n=width*height;
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<32||height<32||
    n>1024*1024||!Number.isInteger(radius)||radius<1||radius>4||
-   !Number.isFinite(strength)||strength<.1||strength>.8)
+   !Number.isFinite(strength)||strength<.1||strength>.8||
+  typeof protectErasedHair!=='boolean')
   throw new TypeError('Invalid hair-boundary experiment settings');
  if(!baseline?.ok||baseline.exportAllowed!==false||
   baseline.previewOnly!==true||baseline.width!==width||baseline.height!==height||
@@ -59,10 +61,14 @@ export function refineReferenceHairEdgeResearch({
   !(semanticVeto.guard instanceof Uint8Array)||semanticVeto.guard.length!==n||
   !(faceZones instanceof Uint8Array)||faceZones.length!==n)
   return fail('Missing independent protective face and semantic model outputs');
+ if(protectErasedHair&&(!isBytes(sourceHairRGBA)||sourceHairRGBA.length!==4*n||
+  !(keepMask instanceof Uint8Array)||keepMask.length!==n))
+  return fail('Guarded donor edge needs full original source hair and approved inpainting mask');
  const source=baseline.rgba,opacity=baseline.opacity;
  let supported=0,forbidden=0;
  for(let i=0;i<n;i++){
-  if(semanticVeto.guard[i]>1||faceZones[i]>2)
+  if(semanticVeto.guard[i]>1||faceZones[i]>2||
+   (protectErasedHair&&keepMask[i]!==0&&keepMask[i]!==255))
    return fail('Untrusted skin/face label values');
   if(opacity[i]){
    supported++;
@@ -97,7 +103,11 @@ export function refineReferenceHairEdgeResearch({
   const t=clamp(nearest/(radius+1),0,1);
   const eased=t*t*(3-2*t);
   const factor=1-strength*(1-eased);
-  const adjusted=Math.min(initial,Math.round(initial*factor));
+  let adjusted=Math.min(initial,Math.round(initial*factor));
+  // Never expose previously erased source hair by crossing the original
+  // 'well-covered' threshold. This does NOT invent scalp or new hairs.
+  if(protectErasedHair&&keepMask[i]===0&&sourceHairRGBA[4*i]>=178&&
+     initial>=160)adjusted=Math.max(adjusted,160);
   if(adjusted===initial)continue;
   newOpacity[i]=adjusted;softened++;
   // Given C_initial=blend(R, D, a), blend(R, C_initial, b/a)
@@ -123,7 +133,7 @@ export function refineReferenceHairEdgeResearch({
   protectedPixelChanges:0,externalInferenceCalls:0,
   counts:{supported,softenedPixels:softened,changedColorChannels:changed,
    maximumChannelDelta:maxDelta,boundaryPairs:before.pairs},
-  measures:{radius,strength,boundaryMeanRGBJumpBefore:before.meanRGBJump,
+  measures:{radius,strength,protectErasedHair,boundaryMeanRGBJumpBefore:before.meanRGBJump,
    boundaryMeanRGBJumpAfter:after.meanRGBJump,
    boundaryJumpDelta:before.meanRGBJump===null||after.meanRGBJump===null?
     null:after.meanRGBJump-before.meanRGBJump},

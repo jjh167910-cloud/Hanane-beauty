@@ -79,3 +79,45 @@ implemented but NOT fully integration-verified.
 No physical Android benchmarking, human visual ratings, legally
 cleared generative model, or independently verified photorealistic
 customer hair transfer is established.
+
+
+## Actual verified result and limitations
+
+**SUCCESSFUL complete workflow**:
+https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39811626099
+on commit `051ff52dbcf8536b416c4a069b3dd82f7003de6a`.
+All unit tests, browser inference, full offline reload, model availability
+and research integrity steps passed. The faster headless-shell browser
+installation also completed successfully on GitHub's Ubuntu runner.
+
+The Phase 34 actual MediaPipe+MI-GAN catalog-photo hairline inspection
+reported:
+
+- `possibleArtificialHairline: true`
+- `inspectionColumns: 174`
+- `maximumHorizontalRunPx: 53`
+- `skinFaceChangedPixels: 0`
+- `visualQualityApproved: false`
+
+Thus the on-device 2D detector found a 53-pixel straight-ish
+forehead cutout sequence that warrants human review. It is a
+heuristic, not independently labeled ground truth.
+
+Phase 35 real-browser focused review confirmed:
+`matchingSourceFrame:true`, `bothSidesRendered:true`,
+`methodLabelsHidden:true`, `photoExportAllowed:false`,
+`realHumanVotes:0`. The Phase 34 warning was reproduced with the
+browser network disabled. The user-facing review still DOES NOT
+show a new generated hairstyle or certify the correctness of either
+variant, despite working offline.
+
+The face-and-donor retention controls from Phase 32 also continued
+to pass on this catalog pair with 98.84% donor opacity retained and
+zero freshly under-covered erased-hair pixels. These are separate
+engineering proxies and cannot overrule the visible artificial cap.
+
+**Engineering and offline reproducibility: PASS.**
+**Visible artifact warning: POSITIVE (possible artificial hairline).**
+**True human visual ratings, independent subjects, commercial hairstyle
+generation, and physical Android benchmarking: NOT AVAILABLE.**
+Production unchanged.

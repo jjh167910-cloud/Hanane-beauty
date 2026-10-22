@@ -88,7 +88,8 @@ export function prioritizeModelDisagreements(labels,width,height,{
    originalHairVsFaceSkin:countByLabel[4],faceSkin:countByLabel[5]
   },
   regions:selected,
-  allRegionsReviewed:false,
+  shortlistCoversAllComponents:selected.length===components.length,
+  allRegionsHumanReviewed:false,
   editingAllowed:false,groundTruthAvailable:false,
   privacyNote:'Bounding boxes derived from portraits may be personal data; do not publish for actual clients without consent.'
  };

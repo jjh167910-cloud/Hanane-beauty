@@ -10,16 +10,11 @@ const REVIEW=new Set([2,3,4]);
 const cmp=(a,b)=>Number(b.hasFaceSkinConflict)-Number(a.hasFaceSkinConflict)||
  b.faceSkinConflictPixels-a.faceSkinConflictPixels||
  b.pixels-a.pixels||a.minY-b.minY||a.minX-b.minX;
-export function prioritizeModelDisagreements(labels,width,height,{
- minPixels=8,maxRegions=20,connectivity=8,pageIndex=0
-}={}){
+export function createModelDisagreementReviewSession(labels,width,height,{connectivity=8}={}){
  if(!(labels instanceof Uint8Array)||!Number.isInteger(width)||!Number.isInteger(height)||
  width<1||height<1||width*height>2_000_000||labels.length!==width*height)
  throw new TypeError('Invalid semantic review labels or dimensions');
- if(!Number.isInteger(minPixels)||minPixels<1||minPixels>1e5||
- !Number.isInteger(maxRegions)||maxRegions<1||maxRegions>200||
- !Number.isInteger(pageIndex)||pageIndex<0||pageIndex>100000||
- ![4,8].includes(connectivity))
+ if(![4,8].includes(connectivity))
  throw new TypeError('Invalid review prioritization settings');
  const n=labels.length,seen=new Uint8Array(n),queue=new Int32Array(n),
  countByLabel=new Uint32Array(6);
@@ -69,6 +64,14 @@ export function prioritizeModelDisagreements(labels,width,height,{
   });
  }
  components.sort(cmp);
+ // No source pixels are retained by the review session. Page changes reuse
+ // one connected-component scan, which matters on memory-limited phones.
+ return Object.freeze({
+  page({minPixels=8,maxRegions=20,pageIndex=0}={}){
+   if(!Number.isInteger(minPixels)||minPixels<1||minPixels>1e5||
+    !Number.isInteger(maxRegions)||maxRegions<1||maxRegions>200||
+    !Number.isInteger(pageIndex)||pageIndex<0||pageIndex>100000)
+    throw new TypeError('Invalid review prioritization settings');
  // Preserve all facial-skin conflicts even if smaller than minPixels.
  const eligible=components.filter(c=>c.pixels>=minPixels||c.hasFaceSkinConflict);
  const totalPages=Math.max(1,Math.ceil(eligible.length/maxRegions));
@@ -102,10 +105,18 @@ export function prioritizeModelDisagreements(labels,width,height,{
    originalOnlyHair:countByLabel[2],multiclassOnlyHair:countByLabel[3],
    originalHairVsFaceSkin:countByLabel[4],faceSkin:countByLabel[5]
   },
-  regions:selected,
+  regions:selected.map(region=>({...region,centroid:{...region.centroid}})),
   shortlistCoversAllComponents:selected.length===components.length,
   allRegionsHumanReviewed:false,
   editingAllowed:false,groundTruthAvailable:false,
   privacyNote:'Bounding boxes derived from portraits may be personal data; do not publish for actual clients without consent.'
  };
+  }
+ });
+}
+
+// Backwards-compatible one-shot API, for callers that only require one page.
+export function prioritizeModelDisagreements(labels,width,height,opts={}){
+ const {connectivity=8,...pageOpts}=opts;
+ return createModelDisagreementReviewSession(labels,width,height,{connectivity}).page(pageOpts);
 }

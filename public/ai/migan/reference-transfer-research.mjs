@@ -5,6 +5,7 @@
  * segmented hairstyle still fails on many portraits.
  */
 import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
+import {createConservativeLandmarkHairWarp} from './landmark-hair-warp.mjs';
 
 const finite=Number.isFinite;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -38,7 +39,7 @@ function linearBlend(base,donor,alpha){
 export function composeReferenceHairResearch({
  sourceRGBA,restoredRGBA,sourceHairRGBA,referenceRGBA,referenceHairRGBA,
  keepMask,semanticVeto,sourceFace,referenceFace,width,height,
- threshold=178,maxScale=1.6,maxRoll=.25,allowNoInpainting=false
+ threshold=178,maxScale=1.6,maxRoll=.25,allowNoInpainting=false,alignmentMode='rigid'
 }){
  const n=width*height;
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<32||
@@ -50,7 +51,7 @@ export function composeReferenceHairResearch({
  if(!Number.isInteger(threshold)||threshold<128||threshold>230||
   !finite(maxScale)||maxScale<1||maxScale>2||
   !finite(maxRoll)||maxRoll<0||maxRoll>.5||
-  typeof allowNoInpainting!=='boolean')
+  typeof allowNoInpainting!=='boolean'||!['rigid','bounded-landmark'].includes(alignmentMode))
   throw new TypeError('Invalid research alignment settings');
  if(!faceOK(sourceFace)||!faceOK(referenceFace))
   return invalid('Two reliable eye anchors required');
@@ -90,6 +91,19 @@ export function composeReferenceHairResearch({
  const cos=Math.cos(delta),sin=Math.sin(delta);
  const sx=sourceFace.eyeX*width,sy=sourceFace.eyeY*height,
   rx=referenceFace.eyeX*width,ry=referenceFace.eyeY*height;
+ const warp=alignmentMode==='bounded-landmark'?createConservativeLandmarkHairWarp({
+  sourceFace,referenceFace,width,height
+ }):null;
+ if(warp&&!warp.ok)
+  return invalid('Landmark-based donor alignment rejected: '+warp.reason);
+ const donorAt=(x,y)=>{
+  if(warp){
+   const q=warp.map(x,y);
+   return q?{x:q.x-.5,y:q.y-.5}:null;
+  }
+  const dx=(x-sx)/scale,dy=(y-sy)/scale;
+  return {x:rx+cos*dx-sin*dy-.5,y:ry+sin*dx+cos*dy-.5};
+ };
  // Check clipping in the reference -> source direction independently.
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
   if(referenceHairRGBA[4*(y*width+x)]<threshold)continue;
@@ -107,8 +121,9 @@ export function composeReferenceHairResearch({
  let pasted=0,faceOverlaps=0,foreheadOverlaps=0;
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
   const i=y*width+x,k=4*i;
-  const dx=(x+.5-sx)/scale,dy=(y+.5-sy)/scale;
-  const ux=rx+cos*dx-sin*dy-.5,uy=ry+sin*dx+cos*dy-.5;
+  const mapped=donorAt(x+.5,y+.5);
+  if(!mapped)continue;
+  const ux=mapped.x,uy=mapped.y;
   if(ux<0||uy<0||ux>=width-1||uy>=height-1)continue;
   const confidence=bilinear(referenceHairRGBA,width,height,ux,uy,0);
   if(confidence<95)continue;
@@ -140,13 +155,15 @@ export function composeReferenceHairResearch({
  if(foreheadOverlaps>0)diagnosticFlags.push('fringe_occlusion_unresolved');
  if(faceOverlaps>0)diagnosticFlags.push('predicted_skin_occlusion_unresolved');
  if(clipFraction>.03)diagnosticFlags.push('reference_border_clipping_risk');
+ if(warp)diagnosticFlags.push('bounded_2d_landmark_warp_no_3d_geometry');
  return {ok:true,reason:'2D diagnostic preview only',rgba:output,opacity,
   width,height,previewOnly:true,exportAllowed:false,referenceHairstyleGenerated:false,
   realisticHairTransferVerified:false,requiresHumanReview:true,
   counts:{sourceHair,donorHair,removed,changedInside,pasted,
    residualSourceHair,faceOverlaps,foreheadOverlaps,referenceClipped},
   measures:{scale,rollDifferenceRadians:delta,referenceClippingFraction:clipFraction,
-   exposedOriginalHairFraction:remainingFraction,pastedFraction:pasted/n},
+   exposedOriginalHairFraction:remainingFraction,pastedFraction:pasted/n,
+   alignmentMode,landmarkAlignment:warp?.stats??null},
   diagnosticFlags,protectedCoreVerifiedByGroundTruth:false,
   warning:'No synthesized strands, pose depth or reconstructed real scalp. Never use as an approved customer hairstyle.'};
 }

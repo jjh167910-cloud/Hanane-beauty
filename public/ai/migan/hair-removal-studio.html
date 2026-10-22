@@ -31,7 +31,13 @@
 <div class="actions"><select id="referenceSample" aria-label="انتخاب مدل موی مرجع">
 <option value="2">مدل مرجع ۲ · پیکسی</option><option value="3">مدل مرجع ۳ · فر کوتاه</option>
 <option value="6">مدل مرجع ۶ · پیکسی</option><option value="9">مدل مرجع ۹</option>
+<option value="local">مرجع جدید از گوشی — فقط برای پژوهش</option>
 </select><button class="btn" id="previewTransfer" disabled>نمایش پیش‌نمایش پژوهشی</button></div>
+<p class="aside">برای آزمایش دو تصویر متفاوت، گزینهٔ مرجع از گوشی را انتخاب کنید. هویت دو نفر با این ابزار تأیید نمی‌شود. تصاویر خارج از دستگاه ارسال یا در کش مدل‌ها ثبت نمی‌شوند.</p>
+<label class="inline-label"><input id="referenceConsent" type="checkbox">
+اجازهٔ پردازش این عکس مرجع را برای پژوهش دارم و حق استفاده از آن را بررسی کرده‌ام.</label>
+<div class="actions"><input type="file" id="referencePhoto" accept="image/jpeg,image/png,image/webp" aria-label="عکس مدل موی مرجع از گوشی">
+<span id="referenceStatus" role="status">عکس مرجع محلی انتخاب نشده است.</span></div>
 <div class="split"><div class="viewer"><div class="lbl">مدل موی مرجع</div><canvas id="referencePortrait" width="512" height="512"></canvas></div>
 <div class="viewer"><div class="lbl">ترکیب آزمایشی؛ کیفیت آرایشگاهی تأیید نشده</div><canvas id="transferPortrait" width="512" height="512"></canvas></div></div>
 <div class="actions">
@@ -55,12 +61,14 @@ import {getLocalHairSegmenter} from '../hair-segmenter.mjs';
 import {getLocalMulticlassSegmenter} from '../offhair-multiclass-baseline.mjs';
 import {createSemanticSkinVeto} from './semantic-skin-veto.mjs';
 import {composeReferenceHairResearch} from './reference-transfer-research.mjs';
+import {inspectLocalReferencePair} from './local-reference-pair.mjs';
 import {planTargetAwareRemoval} from './target-aware-repair.mjs';
 import {createOfflineDeviceEvidence} from './device-evidence.mjs';
 import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
 import {prepareHairRemoval,composeInpaintedRGBA} from './hair-removal-core.mjs';
 const S=512,N=S*S,$=id=>document.getElementById(id);
 let imageData=null,proposal=null,token=0,transferToken=0,sessionPromise=null,reviewSource=null,lastTransferReference=null;
+let localReferenceRGBA=null,referenceLoadToken=0;
 let originalCanvas=$('portrait'),maskCanvas=$('mask'),beforeCanvas=$('before'),afterCanvas=$('after');
 const clearCanvas=c=>{const x=c.getContext('2d');x.clearRect(0,0,S,S);x.fillStyle='#f1e5d7';x.fillRect(0,0,S,S)};
 function status(t,error=false){$('status').textContent=t;$('status').className=error?'error':'';}
@@ -78,7 +86,11 @@ function clearTransfer(){
  $('transferMetrics').textContent='No reference transfer generated · research only';
 }
 function dropResult(){$('deviceEvidence').disabled=true;proposal=null;reviewSource=null;$('run').disabled=true;$('approve').disabled=true;$('approve').checked=false;$('download').disabled=true;window.__hananehHairStage=null;clearCanvas(maskCanvas);clearCanvas(afterCanvas);clearTransfer();}
-function reset(){token++;imageData=null;originalCanvas.getContext('2d').clearRect(0,0,S,S);for(const c of [originalCanvas,beforeCanvas])clearCanvas(c);dropResult();$('analyze').disabled=true;$('photo').value='';$('sample').value='';status('یک تصویر محلی برای شروع انتخاب کنید.');$('metrics').textContent='Ready';}
+function reset(){
+ referenceLoadToken++;localReferenceRGBA=null;
+ $('referencePhoto').value='';$('referenceConsent').checked=false;
+ $('referenceStatus').textContent='عکس مرجع محلی انتخاب نشده است.';
+ token++;imageData=null;originalCanvas.getContext('2d').clearRect(0,0,S,S);for(const c of [originalCanvas,beforeCanvas])clearCanvas(c);dropResult();$('analyze').disabled=true;$('photo').value='';$('sample').value='';status('یک تصویر محلی برای شروع انتخاب کنید.');$('metrics').textContent='Ready';}
 $('clear').addEventListener('click',reset);reset();
 async function prepareOffline(){
  const button=$('prepareOffline');button.disabled=true;
@@ -99,7 +111,7 @@ async function prepareOffline(){
   const assets=['./hair-removal-studio.html','./hair-removal-core.mjs',
    './semantic-skin-veto.mjs','./reference-transfer-research.mjs',
    './target-aware-repair.mjs','./device-evidence.mjs',
-   './landmark-hair-warp.mjs',
+   './landmark-hair-warp.mjs','./local-reference-pair.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
    '../models/hair_segmenter.tflite','../models/blaze_face_short_range.tflite',
@@ -430,6 +442,62 @@ $('deviceEvidence').addEventListener('click',()=>{
 $('download').addEventListener('click',()=>{
  const a=document.createElement('a');a.href=afterCanvas.toDataURL('image/png');a.download='hananeh-hair-removal-research.png';a.click();
 });
+function invalidateLocalReference(){
+ referenceLoadToken++;localReferenceRGBA=null;
+ $('referencePhoto').value='';
+ $('referenceStatus').textContent='مرجع جدید انتخاب نشده یا مجوز آن لغو شده است.';
+ clearTransfer();
+ $('previewTransfer').disabled=!window.__hananehHairStage?.realInpainting;
+}
+$('referenceConsent').addEventListener('change',()=>{
+ // Explicit withdrawal destroys the in-memory pixel buffer and past results.
+ if(!$('referenceConsent').checked)invalidateLocalReference();
+});
+$('referencePhoto').addEventListener('change',async e=>{
+ const file=e.target.files?.[0];
+ if(!file)return;
+ const loadKey=++referenceLoadToken;
+ localReferenceRGBA=null;clearTransfer();
+ const enabled=window.__hananehHairStage?.realInpainting===true;
+ $('previewTransfer').disabled=!enabled;
+ if(!$('referenceConsent').checked){
+  invalidateLocalReference();
+  $('referenceStatus').textContent='ابتدا اجازهٔ پردازش عکس مرجع را تأیید کنید.';
+  return;
+ }
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type)||
+    !Number.isSafeInteger(file.size)||file.size<1024||file.size>12*1024*1024){
+  invalidateLocalReference();
+  $('referenceStatus').textContent='عکس مرجع نامعتبر یا بیش از ۱۲ مگابایت است.';
+  return;
+ }
+ const url=URL.createObjectURL(file);
+ try{
+  const photo=new Image();photo.decoding='async';photo.src=url;
+  await photo.decode();
+  if(loadKey!==referenceLoadToken||!$('referenceConsent').checked)return;
+  if(!photo.naturalWidth||!photo.naturalHeight||
+    photo.naturalWidth>8192||photo.naturalHeight>8192)
+   throw Error('ابعاد مرجع خارج از محدودهٔ مجاز است');
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=S;
+  const c=canvas.getContext('2d',{willReadFrequently:true});
+  c.fillStyle='#eee6dc';c.fillRect(0,0,S,S);
+  const ratio=Math.min(S/photo.naturalWidth,S/photo.naturalHeight);
+  const w=photo.naturalWidth*ratio,h=photo.naturalHeight*ratio;
+  c.drawImage(photo,(S-w)/2,(S-h)/2,w,h);
+  const rgba=c.getImageData(0,0,S,S).data;
+  if(loadKey!==referenceLoadToken||!$('referenceConsent').checked)return;
+  localReferenceRGBA=new Uint8ClampedArray(rgba);
+  $('referenceSample').value='local';
+  $('referenceStatus').textContent='عکس مرجع فقط در حافظهٔ مرورگر آماده است؛ هویت و رضایت مستقل تأیید نشده است.';
+ }catch(err){
+  if(loadKey===referenceLoadToken){
+   localReferenceRGBA=null;
+   $('referencePhoto').value='';
+   $('referenceStatus').textContent='بارگذاری عکس مرجع رد شد: '+String(err.message||err);
+  }
+ }finally{URL.revokeObjectURL(url);}
+});
 $('referenceSample').addEventListener('change',()=>{
  const enabled=window.__hananehHairStage?.realInpainting===true;
  clearTransfer();$('previewTransfer').disabled=!enabled;
@@ -442,16 +510,29 @@ $('previewTransfer').addEventListener('click',async()=>{
  $('previewTransfer').disabled=true;
  $('transferStatus').textContent='در حال تشخیص و تطبیق موی مرجع، کاملاً آفلاین...';
  try{
-  const src=window.OFFLINE_IMAGES?.[$('referenceSample').value];
-  if(!src)throw Error('مرجع در مجموعه تصاویر آفلاین موجود نیست');
-  const img=new Image();img.decoding='async';img.src=src;await img.decode();
-  if(key!==token||request!==transferToken||!$('approve').checked)return;
+  const selected=$('referenceSample').value;
+  const isLocal=selected==='local';
+  if(isLocal&&(!$('referenceConsent').checked||!localReferenceRGBA))
+   throw Error('عکس مرجع محلی و اجازهٔ پردازش آن لازم است');
   const refCanvas=$('referencePortrait');
   const ctx=refCanvas.getContext('2d',{willReadFrequently:true});
-  ctx.fillStyle='#eee6dc';ctx.fillRect(0,0,S,S);
-  const sc=Math.min(S/img.naturalWidth,S/img.naturalHeight);
-  ctx.drawImage(img,(S-img.naturalWidth*sc)/2,(S-img.naturalHeight*sc)/2,
-   img.naturalWidth*sc,img.naturalHeight*sc);
+  if(isLocal){
+   const check=inspectLocalReferencePair({
+    sourceRGBA:imageData.data,referenceRGBA:localReferenceRGBA,width:S,height:S});
+   if(!check.ok)throw Error('عکس مرجع رد شد: '+check.reason);
+   ctx.putImageData(new ImageData(localReferenceRGBA,S,S),0,0);
+  }else{
+   const src=window.OFFLINE_IMAGES?.[selected];
+   if(!src)throw Error('مرجع در مجموعه تصاویر آفلاین موجود نیست');
+   const img=new Image();img.decoding='async';img.src=src;await img.decode();
+   if(key!==token||request!==transferToken||!$('approve').checked)return;
+   ctx.fillStyle='#eee6dc';ctx.fillRect(0,0,S,S);
+   const sc=Math.min(S/img.naturalWidth,S/img.naturalHeight);
+   ctx.drawImage(img,(S-img.naturalWidth*sc)/2,(S-img.naturalHeight*sc)/2,
+    img.naturalWidth*sc,img.naturalHeight*sc);
+  }
+  if(key!==token||request!==transferToken||!$('approve').checked||
+     (isLocal&&!$('referenceConsent').checked))return;
   const engine=await getLocalHairSegmenter();
   if(key!==token||request!==transferToken)return;
   const detection=engine.analyze(refCanvas);
@@ -472,7 +553,9 @@ $('previewTransfer').addEventListener('click',async()=>{
   if(result.exportAllowed!==false)throw Error('خروجی نامطمئن نمی‌تواند تأیید شود');
   $('transferPortrait').getContext('2d').putImageData(new ImageData(result.rgba,S,S),0,0);
   const metadata={ok:true,previewOnly:true,exportAllowed:false,
-   generatedNewHair:false,counts:result.counts,measures:result.measures,
+   generatedNewHair:false,referenceFromLocalFile:isLocal,
+   differentPersonVerified:false,referenceRightsIndependentlyVerified:false,
+   counts:result.counts,measures:result.measures,
    diagnosticFlags:result.diagnosticFlags};
   window.__hananehTransferStage=metadata;
   $('landmarkWarp').disabled=false;

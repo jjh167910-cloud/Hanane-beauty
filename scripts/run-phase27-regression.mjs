@@ -12,6 +12,15 @@ for(const [binary,...prefix] of possibilities){
  process.stdout.write(p.stdout||'');
  process.stderr.write(p.stderr||'');
  status=p.status===0?0:1;
+ if(status===0){
+  const ast=spawnSync(binary,[...prefix,'-c',
+   'import ast,pathlib; ast.parse(pathlib.Path("scripts/phase27_score_outputs.py").read_text(encoding="utf-8"))'],
+   {cwd:process.cwd(),encoding:'utf8',timeout:15000});
+  if(ast.status!==0){
+   process.stderr.write(ast.stderr||'Phase27 optional QA scorer syntax invalid');
+   status=1;
+  }
+ }
  break;
 }
 if(!found)throw new Error('Phase27 Python 3 test interpreter not found');

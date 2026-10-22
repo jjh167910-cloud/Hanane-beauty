@@ -1,0 +1,30 @@
+{
+  "schema": "HANANEH-MOBILE-MODEL-PACK-v1",
+  "id": "HairFastGAN-official-unconverted-teacher",
+  "task": "reference-hairstyle-transfer",
+  "runtime": {
+    "target": "linux-nvidia-cuda",
+    "backend": "cuda",
+    "library": "pytorch"
+  },
+  "inventoryComplete": false,
+  "reportedUpstreamBytes": 7730000000,
+  "reportedBytesPrecision": "HF web UI approximate (7.73 GB), not full verified file inventory",
+  "assets": [],
+  "measurements": null,
+  "quality": null,
+  "metadata": {
+    "upstreamSource": "https://github.com/AIRI-Institute/HairFastGAN",
+    "upstreamSourceGitCommit": "49e98019c9243d1991c19d45764fc3340a498de2",
+    "hostedWeights": "https://huggingface.co/AIRI-Institute/HairFastGAN/tree/main/pretrained_models",
+    "repoLabel": "mit",
+    "componentRights": "unresolved, includes StyleGAN-derived research dependencies",
+    "identifiedCheckpoint": {
+      "path": "pretrained_models/StyleGAN/ffhq.pt",
+      "publishedBytesApprox": 133000000,
+      "sha256": "48a146c502117a283437d1c14f755a9416eb9255694e0964403f95b14fc094e9"
+    },
+    "commercialRelease": "not authorized",
+    "generatorActuallyRunOnAndroid": false
+  }
+}

@@ -86,6 +86,27 @@ try{
  await page.locator('#colorlineAlpha').click();
  const firstColorline=await page.evaluate(()=>window.__hananehColorlineAlphaStage);
  assert.equal(firstColorline.ok,true,'Real color-line hair alpha failed: '+firstColorline.reason);
+ assert.equal(await page.locator('#localAlphaFit').isEnabled(),true);
+ await page.locator('#localAlphaFit').click();
+ const firstLocalFit=await page.evaluate(()=>window.__hananehLocalAlphaFitStage);
+ assert.equal(firstLocalFit.ok,true,'Phase43 actual photograph local fit refused: '+firstLocalFit.reason);
+ assert.equal(firstLocalFit.exportAllowed,false);
+ assert.equal(firstLocalFit.independentlyValidatedHairAlpha,false);
+ assert.equal(firstLocalFit.baselineUnchanged,true);
+ assert.equal(firstLocalFit.protectedFacePixelsChanged,0);
+ assert.equal(firstLocalFit.metrics.originalAcceptedPixels,firstColorline.metrics.resolvedUnknownPixels);
+ assert.equal(firstLocalFit.metrics.unknownPixels,firstColorline.metrics.unknownPixels);
+ assert.equal(firstLocalFit.metrics.totalAcceptedPixels+firstLocalFit.metrics.abstainedPixels,
+  firstColorline.metrics.unknownPixels);
+ assert.ok(firstLocalFit.metrics.newCoverage>=firstLocalFit.metrics.originalCoverage);
+ assert.equal(firstLocalFit.realHairAlphaGroundTruthAvailable,false);
+ assert.equal(firstLocalFit.newStrandsGenerated,false);
+ console.log('PHASE43 REAL PHOTOGRAPH LOCAL ALPHA REGRESSION '+JSON.stringify({
+  baselineKnown:firstLocalFit.metrics.originalAcceptedPixels,
+  newlyEstimated:firstLocalFit.metrics.newlyEstimatedPixels,
+  stillUnresolved:firstLocalFit.metrics.abstainedPixels,
+  extraCoverage:firstLocalFit.metrics.additionalCoverage,
+  realHairAlphaGroundTruthAvailable:false,humanPhotoQualityMeasured:false}));
  // Deliberately synthetic mislabeled data: this tests ONLY file import,
  // consent controls, error arithmetic and offline parity, not authentic
  // independent photographic hair-alpha annotation.
@@ -691,6 +712,9 @@ try{
  assert.equal(await page.locator('#hairTrimap').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehColorlineAlphaStage),null,
   'Photo consent withdrawal must erase prior fractional hair-alpha results');
+ assert.equal(await page.evaluate(()=>window.__hananehLocalAlphaFitStage),null,
+  'Photo consent withdrawal must erase derived local color-regression texture');
+ assert.equal(await page.locator('#localAlphaFit').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehLocalGroundTruthStage),null,
   'Source/reference permission withdrawal must discard third-party masks and numbers');
  assert.equal(await page.locator('#localHairTruth').isDisabled(),true);
@@ -754,6 +778,7 @@ try{
     '/ai/migan/portrait-modnet-neural-audit.mjs',
     '/ai/migan/guarded-hair-trimap.mjs',
     '/ai/migan/hair-alpha-colorline-research.mjs',
+    '/ai/migan/hair-alpha-local-regression.mjs',
     '/ai/migan/hair-alpha-local-groundtruth.mjs',
     ...manifest.parts.map(p=>'/ai/migan/parts/'+p.name)];
    return {files:files.length,present:await Promise.all(files.map(async p=>!!(await cache.match(p))))};
@@ -781,6 +806,16 @@ try{
   'Classical hair opacity inference must run airplane mode: '+offlineColorline.reason);
  assert.deepEqual(offlineColorline.metrics,firstColorline.metrics,
   'Offline reloaded hair alpha must give exactly same supported/abstained counts');
+ await page.locator('#localAlphaFit').click();
+ const offlineLocalFit=await page.evaluate(()=>window.__hananehLocalAlphaFitStage);
+ assert.equal(offlineLocalFit.ok,true,'Offline regression stage rejected: '+offlineLocalFit.reason);
+ assert.deepEqual(offlineLocalFit.metrics,firstLocalFit.metrics,
+  'Real photo local RGB fitting must produce identical metrics with networking disabled');
+ assert.equal(offlineLocalFit.exportAllowed,false);
+ assert.equal(offlineLocalFit.realHairAlphaGroundTruthAvailable,false);
+ console.log('PHASE43 AIRPLANE MODE CONSERVATIVE ALPHA RECOVERY '+JSON.stringify({
+  identicalMetrics:true,newlyEstimated:offlineLocalFit.metrics.newlyEstimatedPixels,
+  photoUploaded:false,customerExport:false}));
  const offlineLocalMask=await attachSyntheticLocalTruth();
  assert.deepEqual(offlineLocalMask.metrics,localMaskTest.metrics,
   'Same local simulated mask must compute identical error/abstention metrics with networking disabled');

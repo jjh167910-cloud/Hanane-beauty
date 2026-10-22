@@ -42,7 +42,7 @@ try{
  await page.reload({waitUntil:'load'});
  const measure=async()=>{
   const {getLocalHairSegmenter}=await import('/ai/hair-segmenter.mjs');
-  const {getLocalMulticlassSegmenter,compareHairModelMasks}=await import('/ai/offhair-multiclass-baseline.mjs');
+  const {getLocalMulticlassSegmenter,compareHairModelMasks,reviewMulticlassHairConsensus}=await import('/ai/offhair-multiclass-baseline.mjs');
   const {differenceMaskStudy,mapTopologyToRGBA}=await import('/ai/offhair-difference-masks.mjs');
   const {observationFromFaceAnchor,transferSupportMask,gateTargetSupport}=await import('/ai/offhair-pose-flow.mjs');
   const {makeLandmarkFaceZones}=await import('/ai/offhair-face-zones.mjs');
@@ -73,6 +73,11 @@ try{
     observations[id].semantic.crossModel=compareHairModelMasks(
      semantics.labels,semantics.width,semantics.height,
      observations[id].mask,dim,dim);
+    const review=reviewMulticlassHairConsensus(
+     semantics.labels,semantics.width,semantics.height,observations[id].mask,dim,dim);
+    observations[id].semantic.review={
+     ...review.counts,editingAllowed:review.editingAllowed,
+     needsHumanReview:review.needsHumanReview,geometryValidated:review.geometryValidated};
    }
   }
   // Measure sensitivity on every available independently segmented source photo.
@@ -194,6 +199,12 @@ try{
   assert.equal(m.classCounts.reduce((a,b)=>a+b,0),m.size[0]*m.size[1]);
   assert.equal(m.crossModel?.usableForAutomaticEditing,false);
   assert.equal(m.crossModel?.hasIndependentGroundTruth,false);
+  assert.equal(m.review?.editingAllowed,false);
+  assert.equal(m.review?.geometryValidated,false);
+  assert.equal(m.review?.background+m.review?.consensusHair+
+   m.review?.originalOnlyHair+m.review?.multiclassOnlyHair+
+   m.review?.originalHairVsFaceSkin+m.review?.faceSkin,
+   m.size[0]*m.size[1],'Every semantic disagreement pixel must be accounted for');
  }
  assert.ok(first.observed.filter(x=>x.hasRealMask&&x.hasFace).length>=3,
   'Insufficient genuine catalog masks and landmarks');

@@ -76,8 +76,27 @@ try{
      observations[id].mask,dim,dim);
     const review=reviewMulticlassHairConsensus(
      semantics.labels,semantics.width,semantics.height,observations[id].mask,dim,dim);
-    const triage=prioritizeModelDisagreements(review.labels,review.width,review.height,{
-     connectivity:8,minPixels:8,maxRegions:20});
+    const params={connectivity:8,minPixels:8,maxRegions:20};
+    const triage=prioritizeModelDisagreements(review.labels,review.width,review.height,params);
+    // Every high-priority skin conflict must be addressable, even after the
+    // first page. This verifies QUEUE COVERAGE, not human review completion.
+    let cursor=0,pages=0,enumeratedCritical=0,enumeratedEligible=0;
+    const seen=new Set();
+    do{
+     const pageResult=prioritizeModelDisagreements(review.labels,review.width,review.height,
+      {...params,pageIndex:cursor});
+     pages++;
+     if(pages>1000)throw Error('Unbounded triage page queue');
+     for(const region of pageResult.regions){
+      if(seen.has(region.regionId))throw Error('Duplicate review region across pages');
+      seen.add(region.regionId);
+      enumeratedEligible++;
+      if(region.hasFaceSkinConflict)enumeratedCritical++;
+     }
+     cursor=pageResult.nextPageIndex;
+    }while(cursor!==null);
+    if(enumeratedCritical!==triage.totalCriticalRegions)
+     throw Error('A pretrained face/skin conflict was omitted from the review queue');
     observations[id].semantic.review={
      ...review.counts,editingAllowed:review.editingAllowed,
      needsHumanReview:review.needsHumanReview,geometryValidated:review.geometryValidated,
@@ -89,6 +108,11 @@ try{
       omittedRegions:triage.omittedRegions,
       omittedFaceSkinConflictPixels:triage.omittedFaceSkinConflictPixels,
       omittedFaceSkinConflictRegions:triage.omittedFaceSkinConflictRegions,
+      criticalRegionCount:triage.totalCriticalRegions,
+      enumeratedCriticalRegions:enumeratedCritical,
+      allCriticalRegionsAddressable:enumeratedCritical===triage.totalCriticalRegions,
+      pagesToEnumerateEligible:pages,enumeratedEligible,
+      allHumanReviewed:false,
       priorityRegions:triage.regions.slice(0,4).map(r=>({
        pixels:r.pixels,faceSkinConflictPixels:r.faceSkinConflictPixels,
        box:[r.minX,r.minY,r.maxX,r.maxY]})),
@@ -222,6 +246,10 @@ try{
   assert.equal(triage.editingAllowed,false);
   assert.equal(triage.groundTruthAvailable,false);
   assert.equal(triage.totalReviewPixels,triage.reviewedPixels+triage.omittedPixels);
+  assert.equal(triage.allCriticalRegionsAddressable,true,
+   'Every pretrained hair/skin conflict must be accessible in review queue');
+  assert.equal(triage.enumeratedCriticalRegions,triage.criticalRegionCount);
+  assert.equal(triage.allHumanReviewed,false);
   assert.equal(triage.totalReviewPixels,
    m.review.originalOnlyHair+m.review.multiclassOnlyHair+
    m.review.originalHairVsFaceSkin);

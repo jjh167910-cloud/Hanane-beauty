@@ -45,6 +45,7 @@ try{
   const {differenceMaskStudy,mapTopologyToRGBA}=await import('/ai/offhair-difference-masks.mjs');
   const {observationFromFaceAnchor,transferSupportMask,gateTargetSupport}=await import('/ai/offhair-pose-flow.mjs');
   const {makeLandmarkFaceZones}=await import('/ai/offhair-face-zones.mjs');
+  const {studyLandmarkStability}=await import('/ai/offhair-landmark-stability.mjs');
   const learnedWeights=await (await fetch('/ai/models/offhair-synthetic-pose-flow-v1.json')).json();
   const engine=await getLocalHairSegmenter(),dim=512;
   const ids=['1','2','3','6','9'],observations={};
@@ -66,6 +67,24 @@ try{
     observations[id].mask=ctx.getImageData(0,0,dim,dim).data;
    }
   }
+  // Measure sensitivity on every available independently segmented source photo.
+  // Same images/landmarks after offline reload. This is NOT calibrated error.
+  const faceStability=ids.map(id=>{
+   const observation=observations[id];
+   if(!observation?.mask||!observation?.face)
+    return {id,ok:false,reason:'Missing local face or hair prediction'};
+   const downsampled=new Uint8Array(128*128);
+   for(let yy=0;yy<128;yy++)for(let xx=0;xx<128;xx++){
+    downsampled[yy*128+xx]=observation.mask[((yy*4+2)*512+(xx*4+2))*4];
+   }
+   const study=studyLandmarkStability({face:observation.face,
+    width:128,height:128,hairMask:downsampled,jitter:.06});
+   return {id,ok:study.ok,reason:study.reason,
+    eligibleForAutomaticEditing:study.eligibleForAutomaticEditing,
+    testedPerturbations:study.testedPerturbations,
+    counts:study.counts,fractions:study.fractions,
+    policy:study.policy};
+  });
   const cases=[['1','2'],['1','3'],['2','6'],['3','1'],['6','2'],['9','1']];
   let presented=false;
   const evaluations=cases.map(([a,b])=>{
@@ -154,7 +173,7 @@ try{
     referenceHairstyleGenerated:dm.referenceHairstyleGenerated};
   });
   return {observed:ids.map(id=>({id,hasRealMask:!!observations[id]?.mask,
-   hasFace:!!observations[id]?.face})),evaluations,
+   hasFace:!!observations[id]?.face})),faceStability,evaluations,
    method:'2d_eye_anchor_proxy_topology',generatedHairstyles:0,photographicQualityVerified:false};
  };
  const first=await page.evaluate(measure);
@@ -170,6 +189,11 @@ try{
   if(d)assert.equal(d.remove+d.add+d.overlap+d.preserve+
     d.faceConflict+d.foreheadPending,512*512,'Anatomical topology must exhaust pixels');
   assert.equal(entry.referenceHairstyleGenerated,false);
+ }
+ assert.ok(first.faceStability.length===5);
+ for(const study of first.faceStability){
+  assert.equal(study.eligibleForAutomaticEditing,false);
+  if(study.ok)assert.equal(study.testedPerturbations,15);
  }
  assert.deepEqual(errors,[]);
  assert.deepEqual(external,[]);
@@ -189,7 +213,8 @@ try{
   first};
  await fs.writeFile(path.join(root,'ai/offhair-dm/topology-ci-evidence.json'),JSON.stringify(evidence,null,2)+'\n');
  console.log('REAL OFFHAIR DIFFERENCE-MASK TOPOLOGY AND OFFLINE RELOAD PASSED '+JSON.stringify({
-  analyzed: first.observed.length,measurable:first.evaluations.filter(x=>x.counts).length,
+  analyzed: first.observed.length,faceStability:first.faceStability,
+  measurable:first.evaluations.filter(x=>x.counts).length,
   accepted:first.evaluations.filter(x=>x.accepted).length,rejected:first.evaluations.filter(x=>!x.accepted).length,
   rollAccepted:first.evaluations.filter(x=>x.rollAblation?.accepted).length,
   anatomyAccepted:first.evaluations.filter(x=>x.landmarkAblation?.accepted).length,

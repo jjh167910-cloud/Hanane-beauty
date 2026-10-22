@@ -22,6 +22,8 @@ export function studyLandmarkStability({face,width,height,hairMask,threshold=178
  const n=width*height;
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<32||height<32||
     n>1024*1024||!validMask(hairMask,n))throw new TypeError('Invalid mask/dimensions');
+ if(!face||!finite(face.eyeDistance)||face.eyeDistance<=0)return {
+  ok:false,reason:'Missing usable landmark geometry',eligibleForAutomaticEditing:false};
  if(!Number.isInteger(threshold)||threshold<1||threshold>255||
     !finite(jitter)||jitter<0||jitter>.25)throw new TypeError('Invalid jitter policy');
  // Fixed, public, reproducible perturbation protocol; NOT a statistical model of FaceDetector errors.

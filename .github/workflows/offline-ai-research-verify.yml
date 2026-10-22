@@ -65,4 +65,7 @@ jobs:
           test -s public/ai/models/blaze_face_short_range.tflite
           test -s public/ai/wasm/vision_wasm_internal.wasm
           test -s public/ai/wasm/vision_wasm_nosimd_internal.wasm
+          test -s public/ai/models/selfie_multiclass_256x256.tflite
+          test -s public/ai/licenses/Apache-2.0.txt
+          test -s public/ai/licenses/MEDIAPIPE_MULTICLASS_NOTICE.txt
           test -s public/_headers

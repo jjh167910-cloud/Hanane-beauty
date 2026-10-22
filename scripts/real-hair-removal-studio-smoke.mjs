@@ -103,6 +103,8 @@ try{
   const {makeLandmarkFaceZones}=await import('/ai/offhair-face-zones.mjs');
   const {prepareHairRemoval}=await import('/ai/migan/hair-removal-core.mjs');
   const {composeReferenceHairResearch}=await import('/ai/migan/reference-transfer-research.mjs');
+  const {planTargetAwareRemoval}=await import('/ai/migan/target-aware-repair.mjs');
+  const {composeInpaintedRGBA}=await import('/ai/migan/hair-removal-core.mjs');
   const W=512, H=512;
   const sourceCanvas=document.querySelector('#portrait');
   const restoredCanvas=document.querySelector('#after');
@@ -124,7 +126,7 @@ try{
    {semanticVeto:veto,faceZones:anatomical.zones});
   if(!prepared.ok)throw Error('Reference study cannot regenerate exact source removal mask');
   const out=[];
-  let shown=false;
+  let shown=false,targetAwareEvidence=null;
   for(const id of ['2','3','6','9']){
    const data=window.OFFLINE_IMAGES?.[id];
    if(!data){out.push({id,ok:false,reason:'Reference sample unavailable'});continue;}
@@ -162,6 +164,90 @@ try{
       throw Error('Source outside edited regions was not preserved');
    }
    if(!shown){
+    // A genuine second MI-GAN inference with a TARGET-AWARE smaller mask,
+    // not an image filter and not a reused first neural output.
+    const plan=planTargetAwareRemoval({
+     approvedKeepMask:prepared.keepMask,
+     referenceHairRGBA:maskCanvas.getContext('2d').getImageData(0,0,W,H).data,
+     sourceFace:sourceDetection.face,referenceFace:detection.face,
+     semanticVeto:veto,faceZones:anatomical.zones,width:W,height:H
+    });
+    if(!plan.ok)throw Error('Target-aware reconstruction plan failed: '+plan.reason);
+    if(!(plan.skippedHiddenPixels>0&&plan.targetRemovalPixels<prepared.hairPixels))
+     throw Error('Real donor mask did not reduce unnecessary scalp erasure');
+    // The original full mask is not changed. Verify subset permission explicitly.
+    for(let i=0;i<W*H;i++){
+     if(plan.keepMask[i]===0&&prepared.keepMask[i]!==0)
+      throw Error('Target-aware proposal introduced an unauthorized edit');
+     if(veto.guard[i]||anatomical.zones[i]===1)
+      if(plan.keepMask[i]===0)throw Error('Target-aware proposal reaches protected facial pixels');
+    }
+    let selectiveRGBA;
+    let secondaryInferenceMs=0;
+    if(plan.requiresInpainting){
+     const manifest=await (await fetch('/ai/migan/model-manifest.json')).json();
+     const modelBytes=new Uint8Array(manifest.size);
+     let cursor=0;
+     for(const part of manifest.parts){
+      const response=await fetch('/ai/migan/parts/'+part.name);
+      if(!response.ok)throw Error('Offline MI-GAN model part missing');
+      const data=new Uint8Array(await response.arrayBuffer());
+      const sha=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)))
+       .map(x=>x.toString(16).padStart(2,'0')).join('');
+      if(data.length!==part.bytes||sha!==part.sha256)
+       throw Error('MI-GAN part failed checksum');
+      modelBytes.set(data,cursor);cursor+=data.length;
+     }
+     if(cursor!==manifest.size)throw Error('Incomplete local MI-GAN bytes');
+     const modelHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',modelBytes)))
+       .map(x=>x.toString(16).padStart(2,'0')).join('');
+     if(modelHash!==manifest.model_sha256)throw Error('MI-GAN model SHA mismatch');
+     const researchSession=await ort.InferenceSession.create(modelBytes,{executionProviders:['wasm']});
+     const rgb=new Uint8Array(W*H*3);
+     for(let i=0;i<W*H;i++)for(let c=0;c<3;c++)rgb[c*W*H+i]=original[4*i+c];
+     const started=performance.now();
+     const pred=await researchSession.run({
+      image:new ort.Tensor('uint8',rgb,[1,3,W,H]),
+      mask:new ort.Tensor('uint8',plan.keepMask,[1,1,W,H])
+     });
+     secondaryInferenceMs=Math.round(performance.now()-started);
+     const output=pred[researchSession.outputNames[0]];
+     if(output.type!=='uint8'||output.dims.join(',')!=='1,3,512,512')
+      throw Error('Unexpected target-aware ONNX tensor');
+     selectiveRGBA=composeInpaintedRGBA(original,output.data,plan.keepMask,W,H).rgba;
+     await researchSession.release();
+    }else selectiveRGBA=new Uint8ClampedArray(original);
+    const alternate=composeReferenceHairResearch({
+     sourceRGBA:original,restoredRGBA:selectiveRGBA,sourceHairRGBA,
+     referenceRGBA:x.getImageData(0,0,W,H).data,
+     referenceHairRGBA:maskCanvas.getContext('2d').getImageData(0,0,W,H).data,
+     keepMask:plan.keepMask,semanticVeto:veto,
+     sourceFace:sourceDetection.face,referenceFace:detection.face,
+     width:W,height:H
+    });
+    if(!alternate.ok)throw Error('Target-aware hairstyle composition failed: '+alternate.reason);
+    if(alternate.exportAllowed!==false)throw Error('Target-aware stage incorrectly authorized export');
+    let actualChanged=0,changedUnderOpaqueDonor=0;
+    for(let i=0;i<W*H;i++){
+     const k=4*i;let changed=false;
+     for(let c=0;c<4;c++)if(alternate.rgba[k+c]!==study.rgba[k+c])changed=true;
+     if(changed)actualChanged++;
+     if(changed&&study.opacity[i]>=254)changedUnderOpaqueDonor++;
+     if(plan.keepMask[i]===255)
+      for(let c=0;c<4;c++)if(selectiveRGBA[k+c]!==original[k+c])
+       throw Error('New neural restoration changed an unapproved source pixel');
+    }
+    targetAwareEvidence={
+     targetStyle:id,originalRemoved:plan.originalRemovalPixels,
+     targetRemoved:plan.targetRemovalPixels,unnecessaryErasureAvoided:plan.skippedHiddenPixels,
+     reductionFraction:plan.reductionFraction,secondaryInferenceMs,
+     comparisonChangedPixels:actualChanged,changesUnderOpaqueDonor:changedUnderOpaqueDonor,
+     baselineResidual:study.measures.exposedOriginalHairFraction,
+     candidateResidual:alternate.measures.exposedOriginalHairFraction,
+     candidateFlags:alternate.diagnosticFlags,
+     safety:{exportAllowed:alternate.exportAllowed,unapprovedEdits:0,
+      customerPhotoUploaded:false,realSecondNeuralRun:plan.requiresInpainting}
+    };
     const section=document.createElement('section');
     section.style.cssText='margin:20px auto;max-width:1050px;padding:16px;border:2px solid #92704b;border-radius:14px';
     const heading=document.createElement('h2');
@@ -171,7 +257,8 @@ try{
      ['Customer source',sourceCanvas,null],
      ['MI-GAN restored source',restoredCanvas,null],
      ['Reference hairstyle '+id,refCanvas,null],
-     ['Research-only composition (not for customers)',null,study.rgba]]){
+     ['Research-only composition (not for customers)',null,study.rgba],
+     ['Phase 26 donor-aware restoration (NOT quality certified)',null,alternate.rgba]]){
      const block=document.createElement('div');
      block.style.cssText='display:inline-block;vertical-align:top;width:min(49%,300px);padding:6px';
      const label=document.createElement('p');label.textContent=title;
@@ -185,12 +272,17 @@ try{
     shown=true;
    }
   }
-  return {trials:out,renderedComparison:shown,sourceRemovalPixels:prepared.hairPixels,
+  return {trials:out,renderedComparison:shown,targetAwareEvidence,sourceRemovalPixels:prepared.hairPixels,
    actualModels:['MediaPipe HairSegmenter','MediaPipe SelfieMulticlass','MI-GAN'],
    photorealismVerified:false,androidVerified:false};
  });
  console.log('PHASE25 REAL TWO-STAGE REFERENCE TRANSFER '+JSON.stringify(previewStudy));
  assert.equal(previewStudy.trials.length,4);
+ assert.ok(previewStudy.targetAwareEvidence?.unnecessaryErasureAvoided>0);
+ assert.equal(previewStudy.targetAwareEvidence?.safety?.unapprovedEdits,0);
+ assert.equal(previewStudy.targetAwareEvidence?.safety?.exportAllowed,false);
+ console.log('PHASE26 TARGET-AWARE GENUINE SECOND MI-GAN RUN '+
+  JSON.stringify(previewStudy.targetAwareEvidence));
  for(const trial of previewStudy.trials)if(trial.ok){
   assert.equal(trial.exportAllowed,false);
   assert.equal(trial.referenceHairstyleGenerated,false);

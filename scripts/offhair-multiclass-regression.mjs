@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {MEDIA_PIPE_MULTICLASS,describeMulticlassLabels,compareHairModelMasks}
+import {MEDIA_PIPE_MULTICLASS,describeMulticlassLabels,compareHairModelMasks,reviewMulticlassHairConsensus}
  from '../public/ai/offhair-multiclass-baseline.mjs';
 const hair=(pixels)=>{const rgba=new Uint8Array(pixels.length*4);
  pixels.forEach((x,i)=>{rgba[i*4]=x?255:0;rgba[i*4+3]=255;});return rgba};
@@ -44,4 +44,24 @@ test('Cross-model perfect agreement still does not imply anatomical correctness'
  assert.equal(x.crossModelHairIoU,1);
  assert.equal(x.usableForAutomaticEditing,false);
  assert.equal(x.hasIndependentGroundTruth,false);
+});
+
+test('Pretrained fusion marks disagreement and face-skin conflict without granting editing',()=>{
+ const classes=Uint8Array.from([1,1,3,1,3,0]);
+ const fusion=reviewMulticlassHairConsensus(classes,3,2,hair([1,0,1,0,0,1]),3,2);
+ assert.deepEqual(Array.from(fusion.labels),[1,3,4,3,5,2]);
+ assert.equal(fusion.counts.consensusHair,1);
+ assert.equal(fusion.counts.originalHairVsFaceSkin,1);
+ assert.equal(fusion.counts.multiclassOnlyHair,2);
+ assert.equal(fusion.counts.originalOnlyHair,1);
+ assert.equal(fusion.needsHumanReview,true);
+ assert.equal(fusion.editingAllowed,false);
+ assert.equal(Object.values(fusion.counts).reduce((a,b)=>a+b,0),6);
+});
+test('Even perfect pretrained consensus never licenses face editing',()=>{
+ const out=reviewMulticlassHairConsensus(Uint8Array.from([1,1]),2,1,hair([1,1]),2,1);
+ assert.equal(out.counts.consensusHair,2);
+ assert.equal(out.needsHumanReview,false);
+ assert.equal(out.editingAllowed,false);
+ assert.equal(out.geometryValidated,false);
 });

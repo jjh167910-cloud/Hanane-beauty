@@ -11,13 +11,14 @@ const cmp=(a,b)=>Number(b.hasFaceSkinConflict)-Number(a.hasFaceSkinConflict)||
  b.faceSkinConflictPixels-a.faceSkinConflictPixels||
  b.pixels-a.pixels||a.minY-b.minY||a.minX-b.minX;
 export function prioritizeModelDisagreements(labels,width,height,{
- minPixels=8,maxRegions=20,connectivity=8
+ minPixels=8,maxRegions=20,connectivity=8,pageIndex=0
 }={}){
  if(!(labels instanceof Uint8Array)||!Number.isInteger(width)||!Number.isInteger(height)||
  width<1||height<1||width*height>2_000_000||labels.length!==width*height)
  throw new TypeError('Invalid semantic review labels or dimensions');
  if(!Number.isInteger(minPixels)||minPixels<1||minPixels>1e5||
  !Number.isInteger(maxRegions)||maxRegions<1||maxRegions>200||
+ !Number.isInteger(pageIndex)||pageIndex<0||pageIndex>100000||
  ![4,8].includes(connectivity))
  throw new TypeError('Invalid review prioritization settings');
  const n=labels.length,seen=new Uint8Array(n),queue=new Int32Array(n),
@@ -55,6 +56,7 @@ export function prioritizeModelDisagreements(labels,width,height,{
   }
   totalReviewPixels+=tail;
   const conflict=kinds.originalHairVsFaceSkin;
+  if(components.length>=20000)throw new RangeError('Excessive mask fragmentation; human review unavailable');
   components.push({
    regionId:'review-'+String(components.length+1).padStart(4,'0'),
    pixels:tail,minX,minY,maxX,maxY,
@@ -69,14 +71,27 @@ export function prioritizeModelDisagreements(labels,width,height,{
  components.sort(cmp);
  // Preserve all facial-skin conflicts even if smaller than minPixels.
  const eligible=components.filter(c=>c.pixels>=minPixels||c.hasFaceSkinConflict);
- const selected=eligible.slice(0,maxRegions);
- const omitted=components.filter(c=>!selected.includes(c));
+ const totalPages=Math.max(1,Math.ceil(eligible.length/maxRegions));
+ if(pageIndex>=totalPages)throw new RangeError('Review page is out of bounds');
+ const selected=eligible.slice(pageIndex*maxRegions,(pageIndex+1)*maxRegions);
+ const selectedIds=new Set(selected.map(c=>c.regionId));
+ const omitted=components.filter(c=>!selectedIds.has(c.regionId));
+ const totalCritical=components.filter(c=>c.hasFaceSkinConflict).length;
+ const criticalOnPage=selected.filter(c=>c.hasFaceSkinConflict).length;
+ const criticalBeforePage=eligible.slice(0,pageIndex*maxRegions)
+  .filter(c=>c.hasFaceSkinConflict).length;
  const omittedCritical=omitted.filter(c=>c.hasFaceSkinConflict);
  const reviewedPixels=selected.reduce((s,r)=>s+r.pixels,0);
  return {
-  policy:'Deterministic geometric triage of pretrained model disagreement; human annotation required',
-  width,height,connectivity,minPixels,maxRegions,
-  reviewRegionCount:components.length,
+  policy:'Deterministic paginated triage of pretrained model disagreement; human annotation required',
+  width,height,connectivity,minPixels,maxRegions,pageIndex,totalPages,
+  nextPageIndex:pageIndex+1<totalPages?pageIndex+1:null,
+  previousPageIndex:pageIndex>0?pageIndex-1:null,
+  reviewRegionCount:components.length,allComponentsAddressable:minPixels===1,
+  allCriticalComponentsAddressable:true,
+  totalCriticalRegions:totalCritical,criticalRegionsOnPage:criticalOnPage,
+  criticalRegionsOnPriorPages:criticalBeforePage,
+  criticalRegionsOnSubsequentPages:totalCritical-criticalBeforePage-criticalOnPage,
   shortlistedRegionCount:selected.length,
   totalReviewPixels,reviewedPixels,omittedPixels:totalReviewPixels-reviewedPixels,
   omittedRegions:omitted.length,

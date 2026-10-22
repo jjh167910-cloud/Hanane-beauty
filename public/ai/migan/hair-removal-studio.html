@@ -43,10 +43,14 @@
 <div class="actions">
  <button type="button" class="btn soft" id="targetAware" disabled>مقایسه بازسازی هدفمند (پژوهشی)</button>
  <button type="button" class="btn soft" id="landmarkWarp" disabled>انطباق مدل مو با نقاط چهره</button>
+ <button type="button" class="btn soft" id="softHairEdge" disabled>مقایسهٔ نرم‌سازی لبهٔ مو</button>
 </div>
 <div class="viewer"><div class="lbl">انتقال مدل موی شش‌نقطه‌ای — صرفاً آزمایشی</div>
 <canvas id="landmarkPortrait" width="512" height="512"></canvas></div>
 <pre id="landmarkMetrics">No nonrigid geometry approval · no export</pre>
+<div class="viewer"><div class="lbl">لبهٔ نرم‌شده در مقایسه با انتقال اصلی — آزمایشی، بدون تولید موی جدید</div>
+<canvas id="softEdgePortrait" width="512" height="512"></canvas></div>
+<pre id="softEdgeMetrics">Boundary pixels untested · no customer export</pre>
 <div class="viewer"><div class="lbl">بازسازی هدفمند زیر مدل مو — آزمایشی و غیرقابل دانلود</div>
 <canvas id="targetAwarePortrait" width="512" height="512"></canvas></div>
 <pre id="targetMetrics">No approved photorealistic hair generation</pre>
@@ -62,6 +66,7 @@ import {getLocalMulticlassSegmenter} from '../offhair-multiclass-baseline.mjs';
 import {createSemanticSkinVeto} from './semantic-skin-veto.mjs';
 import {composeReferenceHairResearch} from './reference-transfer-research.mjs';
 import {inspectLocalReferencePair} from './local-reference-pair.mjs';
+import {refineReferenceHairEdgeResearch} from './hair-boundary-refinement.mjs';
 import {planTargetAwareRemoval} from './target-aware-repair.mjs';
 import {createOfflineDeviceEvidence} from './device-evidence.mjs';
 import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
@@ -75,6 +80,10 @@ function status(t,error=false){$('status').textContent=t;$('status').className=e
 function clearTransfer(){
  transferToken++;lastTransferReference=null;
  $('landmarkWarp').disabled=true;
+ $('softHairEdge').disabled=true;
+ clearCanvas($('softEdgePortrait'));
+ window.__hananehEdgeStage=null;
+ $('softEdgeMetrics').textContent='Boundary pixels untested · no customer export';
  clearCanvas($('landmarkPortrait'));window.__hananehLandmarkStage=null;
  $('landmarkMetrics').textContent='No nonrigid geometry approval · no export';
  $('targetAware').disabled=true;clearCanvas($('targetAwarePortrait'));
@@ -112,6 +121,7 @@ async function prepareOffline(){
    './semantic-skin-veto.mjs','./reference-transfer-research.mjs',
    './target-aware-repair.mjs','./device-evidence.mjs',
    './landmark-hair-warp.mjs','./local-reference-pair.mjs',
+   './hair-boundary-refinement.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
    '../models/hair_segmenter.tflite','../models/blaze_face_short_range.tflite',
@@ -331,6 +341,64 @@ $('landmarkWarp').addEventListener('click',()=>{
  window.__hananehLandmarkStage=evidence;
  $('landmarkMetrics').textContent=JSON.stringify(evidence,null,2);
  $('landmarkWarp').disabled=!(window.__hananehTransferStage?.ok&&$('approve').checked);
+});
+$('softHairEdge').addEventListener('click',()=>{
+ if(!imageData||!proposal||!reviewSource||!lastTransferReference||
+  !window.__hananehTransferStage?.ok||!$('approve').checked)return;
+ $('softHairEdge').disabled=true;
+ const report={ok:false,exportAllowed:false,photorealismVerified:false,
+  referenceHairstyleGenerated:false};
+ try{
+  const base=composeReferenceHairResearch({
+   sourceRGBA:imageData.data,
+   restoredRGBA:afterCanvas.getContext('2d').getImageData(0,0,S,S).data,
+   sourceHairRGBA:reviewSource.sourceHairRGBA,
+   referenceRGBA:lastTransferReference.rgba,
+   referenceHairRGBA:lastTransferReference.hair,
+   keepMask:proposal.keepMask,semanticVeto:reviewSource.semanticVeto,
+   sourceFace:reviewSource.face,referenceFace:lastTransferReference.face,
+   width:S,height:S
+  });
+  if(!base.ok)throw Error('مرحلهٔ پایهٔ مو رد شد: '+base.reason);
+  const restored=afterCanvas.getContext('2d').getImageData(0,0,S,S).data;
+  const zone=makeLandmarkFaceZones(reviewSource.face,S,S);
+  if(!zone.ok)throw Error('خط محافظ صورت نامعتبر است');
+  const experiment=refineReferenceHairEdgeResearch({
+   baseline:base,restoredRGBA:restored,semanticVeto:reviewSource.semanticVeto,
+   faceZones:zone.zones,width:S,height:S
+  });
+  if(!experiment.ok||experiment.exportAllowed!==false)
+   throw Error('آزمایش لبه رد شد: '+experiment.reason);
+  const previous=$('transferPortrait').getContext('2d').getImageData(0,0,S,S).data;
+  let actualDiff=0;
+  for(let i=0;i<N;i++){
+   const k=4*i;
+   if(base.rgba[k]!==previous[k]||base.rgba[k+1]!==previous[k+1]||
+    base.rgba[k+2]!==previous[k+2]||base.rgba[k+3]!==previous[k+3])
+    throw Error('تصویر مرجع با نتیجهٔ فعلی مطابقت ندارد');
+   if(experiment.rgba[k]!==previous[k]||experiment.rgba[k+1]!==previous[k+1]||
+    experiment.rgba[k+2]!==previous[k+2])actualDiff++;
+  }
+  $('softEdgePortrait').getContext('2d').putImageData(
+   new ImageData(experiment.rgba,S,S),0,0);
+  report.ok=true;
+  report.previewOnly=true;
+  report.changedPixels=actualDiff;
+  report.counts=experiment.counts;
+  report.boundaryProxy=experiment.measures;
+  report.diagnosticFlags=experiment.diagnosticFlags;
+  report.independentHairQualityScore=null;
+  report.faceProtectionApplied=true;
+  $('transferStatus').textContent=
+   'آزمایش لبهٔ نرم اجرا شد؛ این شاخص صرفاً اختلاف پیکسل است، نه تأیید زیبایی نتیجه.';
+ }catch(err){
+  clearCanvas($('softEdgePortrait'));
+  report.reason=String(err.message||err);
+  $('transferStatus').textContent='نرم‌سازی لبهٔ مو رد شد: '+report.reason;
+ }
+ window.__hananehEdgeStage=report;
+ $('softEdgeMetrics').textContent=JSON.stringify(report,null,2);
+ $('softHairEdge').disabled=!(window.__hananehTransferStage?.ok&&$('approve').checked);
 });
 $('targetAware').addEventListener('click',async()=>{
  if(!lastTransferReference||!imageData||!proposal||!reviewSource||
@@ -558,6 +626,7 @@ $('previewTransfer').addEventListener('click',async()=>{
    counts:result.counts,measures:result.measures,
    diagnosticFlags:result.diagnosticFlags};
   window.__hananehTransferStage=metadata;
+  $('softHairEdge').disabled=false;
   $('landmarkWarp').disabled=false;
   lastTransferReference={face:detection.face,
    rgba:ctx.getImageData(0,0,S,S).data,

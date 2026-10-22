@@ -97,3 +97,37 @@ real MediaPipe hair/multiclass inference, MI-GAN, the Phase 38
 MODNet and **Phase 39 known/unknown/background trimap** operating
 with browser networking disabled and consent withdrawal enforced.
 A passing unit suite alone is not the full-integrated PASS.
+
+
+## Verified real-browser results (October 22, 2026)
+
+**Complete GitHub Actions SUCCESS on commit**
+`4fe9af76c9dc60e88027690430f5bf8faa1e247e`:
+https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39820050056
+
+The integrated browser run used the *actual* local hair segmentation,
+semantic face veto, MI-GAN inpainting and packaged MODNet assets
+(not synthetic-only masks). Full-image resolution: **512 x 512**.
+
+| Actual hair-trimap class | Number of pixels | Fraction |
+|---|---:|---:|
+| Known hair interior (255) | 12,986 | 4.95% |
+| Unknown edge region (128) | 11,284 | 4.30% |
+| Definite background / protected face (0) | 237,874 | 90.74% |
+| **Total** | **262,144** | **100%** |
+
+**669 pixels** with confidently predicted hair were overridden by the
+independent protected-face/skin veto. This is evidence of *model
+disagreement*, not proof the hair labels or face veto are
+anatomically correct. Human scrutiny is necessary for legitimate
+fringe strands crossing the forehead.
+
+The counts repeated **exactly** with all browser networking disabled.
+Consent revocation discarded previous trimap results. All software
+unit tests and the complete headless neural/browser workflow succeeded.
+
+**Conclusion:** A model-ready, face-protected, locally computed hair
+trimap works offline and quantifies an uncertain region of **11,284
+pixels** on the tested image. It does **not** predict hair alpha,
+recover natural wisps, demonstrate improvement in photo realism, or
+authorize commercial use. The hair-cap forehead issue remains.

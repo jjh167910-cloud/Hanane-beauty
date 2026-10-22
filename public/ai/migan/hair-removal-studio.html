@@ -54,6 +54,7 @@ body.review-focus #humanReview{margin-top:0;min-height:calc(100vh - 28px)}
  <button type="button" class="btn soft" id="targetAware" disabled>مقایسه بازسازی هدفمند (پژوهشی)</button>
  <button type="button" class="btn soft" id="landmarkWarp" disabled>انطباق مدل مو با نقاط چهره</button>
  <button type="button" class="btn soft" id="softHairEdge" disabled>مقایسهٔ نرم‌سازی لبهٔ مو</button>
+ <button type="button" class="btn soft" id="hairlineAudit" disabled>نشان دادن نقاط مشکوک خط رویش مو</button>
 </div>
 <div class="viewer"><div class="lbl">انتقال مدل موی شش‌نقطه‌ای — صرفاً آزمایشی</div>
 <canvas id="landmarkPortrait" width="512" height="512"></canvas></div>
@@ -61,6 +62,9 @@ body.review-focus #humanReview{margin-top:0;min-height:calc(100vh - 28px)}
 <div class="viewer"><div class="lbl">لبهٔ نرم‌شده در مقایسه با انتقال اصلی — آزمایشی، بدون تولید موی جدید</div>
 <canvas id="softEdgePortrait" width="512" height="512"></canvas></div>
 <pre id="softEdgeMetrics">Boundary pixels untested · no customer export</pre>
+<div class="viewer"><div class="lbl">هشدار محل برش مصنوعی خط مو — فقط راهنمای بررسی، نه تشخیص قطعی</div>
+<canvas id="hairlineDiagnosticPortrait" width="512" height="512"></canvas></div>
+<pre id="hairlineMetrics">No hairline artifact diagnosis · photos stay on device</pre>
 <div class="viewer"><div class="lbl">بازسازی هدفمند زیر مدل مو — آزمایشی و غیرقابل دانلود</div>
 <canvas id="targetAwarePortrait" width="512" height="512"></canvas></div>
 <pre id="targetMetrics">No approved photorealistic hair generation</pre>
@@ -94,6 +98,7 @@ import {composeReferenceHairResearch} from './reference-transfer-research.mjs';
 import {inspectLocalReferencePair} from './local-reference-pair.mjs';
 import {refineReferenceHairEdgeResearch} from './hair-boundary-refinement.mjs';
 import {auditHairEdgeRetention} from './hair-retention-risk.mjs';
+import {locateForeheadCutoutRisk} from './hairline-hotspot-audit.mjs';
 import {createBlindedHairReview,REVIEW_QUESTIONS} from './blind-human-review.mjs';
 import {planTargetAwareRemoval} from './target-aware-repair.mjs';
 import {createOfflineDeviceEvidence} from './device-evidence.mjs';
@@ -124,6 +129,10 @@ function clearTransfer(){
  transferToken++;lastTransferReference=null;
  $('landmarkWarp').disabled=true;
  $('softHairEdge').disabled=true;
+ $('hairlineAudit').disabled=true;
+ clearCanvas($('hairlineDiagnosticPortrait'));
+ window.__hananehHairlineStage=null;
+ $('hairlineMetrics').textContent='No hairline artifact diagnosis · photos stay on device';
  clearCanvas($('softEdgePortrait'));
  window.__hananehEdgeStage=null;
  $('softEdgeMetrics').textContent='Boundary pixels untested · no customer export';
@@ -165,6 +174,7 @@ async function prepareOffline(){
    './target-aware-repair.mjs','./device-evidence.mjs',
    './landmark-hair-warp.mjs','./local-reference-pair.mjs',
    './hair-boundary-refinement.mjs','./hair-retention-risk.mjs',
+   './hairline-hotspot-audit.mjs',
    './blind-human-review.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
@@ -385,6 +395,70 @@ $('landmarkWarp').addEventListener('click',()=>{
  window.__hananehLandmarkStage=evidence;
  $('landmarkMetrics').textContent=JSON.stringify(evidence,null,2);
  $('landmarkWarp').disabled=!(window.__hananehTransferStage?.ok&&$('approve').checked);
+});
+$('hairlineAudit').addEventListener('click',()=>{
+ if(!imageData||!proposal||!reviewSource||!lastTransferReference||
+  !window.__hananehTransferStage?.ok||!$('approve').checked)return;
+ $('hairlineAudit').disabled=true;
+ const report={ok:false,exportAllowed:false,photorealismVerified:false};
+ try{
+  const base=composeReferenceHairResearch({
+   sourceRGBA:imageData.data,
+   restoredRGBA:afterCanvas.getContext('2d').getImageData(0,0,S,S).data,
+   sourceHairRGBA:reviewSource.sourceHairRGBA,
+   referenceRGBA:lastTransferReference.rgba,
+   referenceHairRGBA:lastTransferReference.hair,
+   keepMask:proposal.keepMask,semanticVeto:reviewSource.semanticVeto,
+   sourceFace:reviewSource.face,referenceFace:lastTransferReference.face,
+   width:S,height:S
+  });
+  if(!base.ok)throw Error('انتقال پایه برای تشخیص خط مو نامعتبر است: '+base.reason);
+  const zone=makeLandmarkFaceZones(reviewSource.face,S,S);
+  if(!zone.ok)throw Error('محدودهٔ محافظ چهره نامعتبر است');
+  const audit=locateForeheadCutoutRisk({
+   candidate:base,sourceFace:reviewSource.face,
+   semanticVeto:reviewSource.semanticVeto,faceZones:zone.zones,
+   width:S,height:S
+  });
+  if(!audit.ok||audit.exportAllowed!==false)
+   throw Error('شناسایی ناحیهٔ مشکوک رد شد: '+audit.reason);
+  const canvas=$('hairlineDiagnosticPortrait'),ctx=canvas.getContext('2d');
+  ctx.putImageData(new ImageData(base.rgba,S,S),0,0);
+  if(audit.privateOverlay?.box){
+   const {box,segment}=audit.privateOverlay;
+   ctx.save();ctx.lineWidth=3;ctx.setLineDash([8,5]);
+   ctx.strokeStyle=audit.possibleArtificialHairline?'#cf3030':'#cb9c36';
+   ctx.strokeRect(box.x+.5,box.y+.5,box.width,box.height);
+   if(segment){
+    ctx.setLineDash([]);
+    ctx.lineWidth=4;
+    ctx.beginPath();ctx.moveTo(segment.x0,segment.y);
+    ctx.lineTo(segment.x1,segment.y);ctx.stroke();
+   }
+   ctx.restore();
+  }
+  report.ok=true;
+  report.possibleArtificialHairline=audit.possibleArtificialHairline;
+  report.needsHumanHairlineReview=true;
+  report.findings=audit.findings;
+  report.faceProtectionApplied=true;
+  report.realHumanHairlineRating=null;
+  report.photorealismVerified=false;
+  report.commercialReleaseAllowed=false;
+  report.exportAllowed=false;
+  // Critically, ROI pixel coordinates remain private to the local painter;
+  // the report/telemetry contains only aggregate numeric proxies.
+  $('transferStatus').textContent=audit.possibleArtificialHairline?
+   'هشدار: خط مو ممکن است حالت برش مصنوعی داشته باشد؛ بررسی بصری لازم است.':
+   'ناحیهٔ برش افقی قطعی یافت نشد، اما این به معنی طبیعی بودن خط مو نیست.';
+ }catch(err){
+  clearCanvas($('hairlineDiagnosticPortrait'));
+  report.reason=String(err.message||err);
+  $('transferStatus').textContent='بررسی موضعی خط مو رد شد: '+report.reason;
+ }
+ window.__hananehHairlineStage=report;
+ $('hairlineMetrics').textContent=JSON.stringify(report,null,2);
+ $('hairlineAudit').disabled=!(window.__hananehTransferStage?.ok&&$('approve').checked);
 });
 $('softHairEdge').addEventListener('click',()=>{
  if(!imageData||!proposal||!reviewSource||!lastTransferReference||
@@ -774,6 +848,7 @@ $('previewTransfer').addEventListener('click',async()=>{
    counts:result.counts,measures:result.measures,
    diagnosticFlags:result.diagnosticFlags};
   window.__hananehTransferStage=metadata;
+  $('hairlineAudit').disabled=false;
   $('softHairEdge').disabled=false;
   $('landmarkWarp').disabled=false;
   lastTransferReference={face:detection.face,

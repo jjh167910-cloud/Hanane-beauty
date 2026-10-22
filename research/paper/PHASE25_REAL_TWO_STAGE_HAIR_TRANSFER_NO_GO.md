@@ -70,9 +70,12 @@ The image is not suitable to promote as premium photographic try-on.
 - Possible image identity overlap in the bundled model catalog means a
   "new customer" claim would be especially misleading. No held-out
   independent portraits were used.
-- Full offline hairstyle-preview **after restart** must be independently
-  checked in the newer end-to-end browser CI, not inferred from the initial
-  full-reconstruction offline repeat alone.
+- **Verified in subsequent end-to-end Chromium CI**:
+  https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39733107633
+  The source is reconstructed after browser network disable/reload and the
+  chosen hairstyle overlay recomputed from the locally cached real models.
+  The same transfer pixel counts and failure warnings match the first run.
+  This verifies the tested Linux browser only, not a physical Android phone.
 
 ## Next work, not completed
 A commercially usable and identity-preserving **hair-specific** bald

@@ -72,7 +72,8 @@ test('all protected skin, face and outside-support modifications fail closed',()
  assert.equal(recover(p).ok,false);
  p=input();p.softened.rgba[0]=12;
  assert.equal(recover(p).ok,false);
- p=input();p.softened.opacity[18*W+45]=255+1;
+ p=input();p.baseline.opacity[18*W+45]=205;
+ p.softened.opacity[18*W+45]=220;
  assert.equal(recover(p).ok,false);
  p=input();p.semanticVeto.guard[0]=8;
  assert.equal(recover(p).ok,false);

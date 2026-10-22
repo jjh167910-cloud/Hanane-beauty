@@ -24,9 +24,13 @@ jobs:
       - run: npm run build
       - run: npm run test:unit
       - name: Install headless browser test dependencies
+        # Tests launch Chromium without a branded channel; only the smaller
+        # headless shell is needed. Avoid an unlimited apt-get step on routine
+        # research pushes (the previous runner stalled there).
+        timeout-minutes: 3
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.56.1
-          npx playwright install --with-deps chromium
+          npx playwright install --only-shell chromium
       - name: Verify genuine browser-only hair segmentation
         run: node scripts/real-browser-inference-smoke.mjs
       - name: Train and evaluate isolated synthetic pose-flow student (NO real images)

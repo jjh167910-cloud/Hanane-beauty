@@ -111,3 +111,32 @@ revocation, and airplane-mode offline UI availability.
 All verifications must PASS on the exact reviewed commit before
 claiming the engineering workflow passes. Even successful CI is
 NOT a verified human study. No commercial production merge.
+
+
+## Verified implementation result (2026-10-22)
+
+Full source + CI workflow `39807444597` finished **SUCCESS**:
+https://github.com/jjh167910-cloud/Hanane-beauty/actions/runs/39807444597
+
+It verified the real local MediaPipe hair/face models, MI-GAN
+source restoration, protected rigid hairstyle transfer, corrected
+inner-edge variant, existing reference-photo consent, offline model
+availability and the focused visual-review UI.
+
+- Phase 33 unit suite PASS: randomized A/B assignment, required
+  four-topic explicit votes, incompatible votes refused, abstentions
+  preserved, compatibility with the existing paired analyzer,
+  no image content, and consent-state destruction.
+- Playwright Phase 33 browser integration PASS: **4 automated
+  `cannot_judge` answers**; completed JSON download, no real
+  image/photo hashes/device fingerprints; no inferred real-person
+  votes or commercial license; focused mode hides earlier labeled
+  panels but retains source and reference portraits.
+- After full offline reload, the focused reviewer UI still displayed
+  all four questions and did not permit export without manual votes.
+- `is_publication_ready` and `human_preferences_verified` remain
+  explicitly false, even though technical execution is verified.
+
+**Engineering reviewer workflow: PASS. Actual independent human
+visual preference evidence: NOT COLLECTED. Customer-ready photo
+realism: NOT ESTABLISHED. Production stays unchanged.**

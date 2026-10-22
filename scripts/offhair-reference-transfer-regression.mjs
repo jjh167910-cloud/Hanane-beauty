@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSemanticSkinVeto} from '../public/ai/migan/semantic-skin-veto.mjs';
 import {composeReferenceHairResearch} from '../public/ai/migan/reference-transfer-research.mjs';
+import {makeLandmarkFaceZones} from '../public/ai/offhair-face-zones.mjs';
+import {prepareHairRemoval} from '../public/ai/migan/hair-removal-core.mjs';
 
 const W=128,H=128,N=W*H;
 const face={eyeX:.5,eyeY:.48,eyeDistance:.2,eyeSpan:.2,
@@ -88,4 +90,26 @@ test('rejects malformed buffers, masks and alignment options',()=>{
  assert.throws(()=>composeReferenceHairResearch(q),/binary/);
  const t=setup();
  assert.throws(()=>composeReferenceHairResearch({...t,maxRoll:2}),/Invalid research/);
+});
+
+test('additional face-zone protection makes a removal mask a strict subset',()=>{
+ const p=setup();
+ const a=new Uint8ClampedArray(p.sourceHairRGBA);
+ // Simulate hair segmenter erroneously marking eyes/nose as hair.
+ for(let y=59;y<65;y++)for(let x=60;x<68;x++)a[(y*W+x)*4]=255;
+ const legacy=prepareHairRemoval(a,W,H,face,{semanticVeto:p.semanticVeto});
+ assert.equal(legacy.ok,true);
+ const zones=makeLandmarkFaceZones(face,W,H);
+ assert.equal(zones.ok,true);
+ const safer=prepareHairRemoval(a,W,H,face,
+  {semanticVeto:p.semanticVeto,faceZones:zones.zones});
+ assert.equal(safer.ok,true,safer.reason);
+ assert.equal(safer.faceLandmarkGuardApplied,true);
+ for(let i=0;i<N;i++)if(safer.keepMask[i]===0){
+  assert.equal(legacy.keepMask[i],0,'An additional guard can never expand the removal mask');
+  assert.notEqual(zones.zones[i],1,'Immutable facial landmarks cannot be reconstructed');
+ }
+ const untrusted=new Uint8Array(N);untrusted[0]=7;
+ assert.equal(prepareHairRemoval(a,W,H,face,
+  {semanticVeto:p.semanticVeto,faceZones:untrusted}).ok,false);
 });

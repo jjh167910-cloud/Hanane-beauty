@@ -401,6 +401,21 @@ try{
  assert.equal(offlineTarget.targetRemovalPixels,liveTarget.targetRemovalPixels);
  assert.equal(offlineTarget.unnecessaryErasureAvoided,liveTarget.unnecessaryErasureAvoided);
  assert.equal(offlineTarget.exportAllowed,false);
+ const [offlineEvidenceDownload]=await Promise.all([
+  page.waitForEvent('download'),page.locator('#deviceEvidence').click()
+ ]);
+ const offlineDeviceEvidence=JSON.parse(await fs.readFile(
+  await offlineEvidenceDownload.path(),'utf8'));
+ assert.equal(offlineDeviceEvidence.ok,true);
+ assert.equal(offlineDeviceEvidence.runtime.disconnectedAtExport,true,
+  'Device evidence must accurately record browser network-offline state');
+ assert.equal(offlineDeviceEvidence.targetAware.completed,true);
+ assert.equal(offlineDeviceEvidence.credibility.fullNetworkIsolationIndependentlyVerified,false,
+  'Device evidence must not pretend to certify independent OS isolation');
+ assert.equal(offlineDeviceEvidence.commercialReleaseAllowed,false);
+ console.log('PHASE28 OFFLINE ANONYMOUS DEVICE JSON PASSED '+JSON.stringify({
+  modelRanWithNetworkDisabled:true,
+  noPhotosOrHardwareIdentifiersExported:true,commercialReleaseAllowed:false}));
 
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
  console.log('AIRPLANE MODE FULL MEDIAPIPE TO MI-GAN INPAINTING PASSED '+JSON.stringify({inferenceMs:result.inferenceMs,cacheFiles:stored.files,referenceHairstyleTransfer:result.generatedHair}));

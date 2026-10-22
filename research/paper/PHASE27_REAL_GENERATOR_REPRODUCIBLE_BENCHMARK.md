@@ -55,6 +55,11 @@ mode requiring a local JSON manifest and file root. A valid manifest has:
   Symlinks, missing records, path traversal, hash mismatch and unsupported
   image signatures are rejected.
 
+In the first frozen protocol, `shape_image` and `color_image` MUST refer
+to the SAME consented reference photo. A third-person hair-color source is
+blocked until its independent permission/consent is represented in a
+higher-versioned schema.
+
 The harness checks *presence and hashes*, not validity/scope of the user's
 legal consent or license agreements. Placeholder forms or synthetic identities
 are **not proof of rights**. Do not use gallery portraits whose independent
@@ -117,3 +122,43 @@ deployment and all commercial salon output.** If the specialised generator
 clearly beats the Phase 26 baseline on independent portraits, investigate
 constrained student distillation using only authorized datasets/teacher
 outputs, then quantize and benchmark on physical Android hardware.
+
+## Optional local visual A/B and protected-face checks
+
+`scripts/phase27_score_outputs.py` is an optional **post-inference** local
+image-review helper. Install Pillow on the REVIEW COMPUTER only; it is not
+bundled into the salon website. An external
+`HANANEH-PHASE27-REVIEW-v1` JSON describes up to 50 local cases:
+
+```json
+{
+  "schema": "HANANEH-PHASE27-REVIEW-v1",
+  "cases": [{
+    "case_id": "licensed-trial-01",
+    "source_aligned": "a/source.png",
+    "phase26_aligned": "a/phase26.png",
+    "candidate_aligned": "a/generator.png",
+    "independent_face_protect_mask": "a/face-mask-independent.png"
+  }]
+}
+```
+
+The helper requires pixel-identical registration and a sufficiently large
+independently annotated facial region. It reports baseline vs candidate RGB
+difference within that protected area and creates a 3-column watermarked
+local contact sheet for blinded visual review. Pixel drift is not verified
+identity similarity, hair realism or hairstyle fidelity. All human ratings
+are deliberately NULL, and commercial release remains FALSE.
+
+```bash
+python3 scripts/phase27_score_outputs.py \
+  --review-json /private/phase27-review.json \
+  --data-root /private/consented-photos \
+  --report /private/review/metrics.json \
+  --contact-sheet /private/review/unrated-contact-sheet.png
+```
+
+**No actual HairFastGAN outputs, blinded ratings or phone tests have been
+generated in this ChatGPT session.** The smoke tests use synthetic bytes
+solely to test the refusal logic; such bytes are not valid photographic
+scientific material. Licensing remains a blocking requirement.

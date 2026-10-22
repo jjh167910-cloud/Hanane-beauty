@@ -93,6 +93,108 @@ try{
  assert.deepEqual(external,[]);
  assert.deepEqual(errors,[]);
  await page.screenshot({path:path.join(root,'ai/migan/hair-removal-studio-evidence.png'),fullPage:true});
+ // Phase 25: combine the REAL reconstructed source with REAL reference hair
+ // segmentation. This is only a photo-compositing feasibility experiment.
+ const previewStudy=await page.evaluate(async()=>{
+  const {getLocalHairSegmenter}=await import('/ai/hair-segmenter.mjs');
+  const {getLocalMulticlassSegmenter}=await import('/ai/offhair-multiclass-baseline.mjs');
+  const {createSemanticSkinVeto}=await import('/ai/migan/semantic-skin-veto.mjs');
+  const {prepareHairRemoval}=await import('/ai/migan/hair-removal-core.mjs');
+  const {composeReferenceHairResearch}=await import('/ai/migan/reference-transfer-research.mjs');
+  const W=512, H=512;
+  const sourceCanvas=document.querySelector('#portrait');
+  const restoredCanvas=document.querySelector('#after');
+  const hairEngine=await getLocalHairSegmenter();
+  const multiEngine=await getLocalMulticlassSegmenter();
+  const sourceDetection=hairEngine.analyze(sourceCanvas);
+  if(!sourceDetection.mask||!sourceDetection.face)throw Error('Missing measured source hair/face');
+  const sourceMask=document.createElement('canvas');sourceMask.width=sourceMask.height=W;
+  sourceMask.getContext('2d').drawImage(sourceDetection.mask,0,0,W,H);
+  const sourceHairRGBA=sourceMask.getContext('2d').getImageData(0,0,W,H).data;
+  const original=sourceCanvas.getContext('2d').getImageData(0,0,W,H).data;
+  const restored=restoredCanvas.getContext('2d').getImageData(0,0,W,H).data;
+  const m=multiEngine.analyze(sourceCanvas);
+  const veto=createSemanticSkinVeto(m.labels,m.width,m.height,W,H);
+  if(!veto.ok)throw Error('Reference study cannot obtain semantic safety veto');
+  const prepared=prepareHairRemoval(sourceHairRGBA,W,H,sourceDetection.face,{semanticVeto:veto});
+  if(!prepared.ok)throw Error('Reference study cannot regenerate exact source removal mask');
+  const out=[];
+  let shown=false;
+  for(const id of ['2','3','6','9']){
+   const data=window.OFFLINE_IMAGES?.[id];
+   if(!data){out.push({id,ok:false,reason:'Reference sample unavailable'});continue;}
+   const img=new Image();img.src=data;await img.decode();
+   const refCanvas=document.createElement('canvas');refCanvas.width=refCanvas.height=W;
+   const x=refCanvas.getContext('2d');x.fillStyle='#eee6dc';x.fillRect(0,0,W,H);
+   const scale=Math.min(W/img.naturalWidth,H/img.naturalHeight);
+   x.drawImage(img,(W-img.naturalWidth*scale)/2,(H-img.naturalHeight*scale)/2,
+    img.naturalWidth*scale,img.naturalHeight*scale);
+   const detection=hairEngine.analyze(refCanvas);
+   if(!detection.face||!detection.mask){
+    out.push({id,ok:false,reason:'Reference hair or eyes undetected'});continue;
+   }
+   const maskCanvas=document.createElement('canvas');maskCanvas.width=maskCanvas.height=W;
+   maskCanvas.getContext('2d').drawImage(detection.mask,0,0,W,H);
+   const study=composeReferenceHairResearch({
+    sourceRGBA:original,restoredRGBA:restored,sourceHairRGBA,
+    referenceRGBA:x.getImageData(0,0,W,H).data,
+    referenceHairRGBA:maskCanvas.getContext('2d').getImageData(0,0,W,H).data,
+    keepMask:prepared.keepMask,semanticVeto:veto,
+    sourceFace:sourceDetection.face,referenceFace:detection.face,
+    width:W,height:H
+   });
+   out.push({id,ok:study.ok,reason:study.reason,counts:study.counts,
+    measures:study.measures,diagnosticFlags:study.diagnosticFlags,
+    exportAllowed:study.exportAllowed,
+    referenceHairstyleGenerated:study.referenceHairstyleGenerated});
+   if(!study.ok)continue;
+   if(study.exportAllowed||study.referenceHairstyleGenerated)
+    throw Error('Experimental overlay wrongly authorized commercial export');
+   for(let i=0;i<W*H;i++){
+    if(veto.guard[i]&&study.opacity[i])throw Error('Transferred hair crossed skin veto');
+    if(prepared.keepMask[i]===255&&!study.opacity[i])
+     for(let c=0;c<4;c++)if(study.rgba[i*4+c]!==original[i*4+c])
+      throw Error('Source outside edited regions was not preserved');
+   }
+   if(!shown){
+    const section=document.createElement('section');
+    section.style.cssText='margin:20px auto;max-width:1050px;padding:16px;border:2px solid #92704b;border-radius:14px';
+    const heading=document.createElement('h2');
+    heading.textContent='Phase 25: offline 2D hair transfer — NOT photorealistic AI';
+    section.appendChild(heading);
+    for(const [title,canvas,bytes] of [
+     ['Customer source',sourceCanvas,null],
+     ['MI-GAN restored source',restoredCanvas,null],
+     ['Reference hairstyle '+id,refCanvas,null],
+     ['Research-only composition (not for customers)',null,study.rgba]]){
+     const block=document.createElement('div');
+     block.style.cssText='display:inline-block;vertical-align:top;width:min(49%,300px);padding:6px';
+     const label=document.createElement('p');label.textContent=title;
+     const frame=document.createElement('canvas');frame.width=frame.height=W;
+     frame.style.cssText='width:100%;height:auto';
+     if(canvas)frame.getContext('2d').drawImage(canvas,0,0);
+     else frame.getContext('2d').putImageData(new ImageData(bytes,W,H),0,0);
+     block.append(label,frame);section.appendChild(block);
+    }
+    document.body.appendChild(section);
+    shown=true;
+   }
+  }
+  return {trials:out,renderedComparison:shown,sourceRemovalPixels:prepared.hairPixels,
+   actualModels:['MediaPipe HairSegmenter','MediaPipe SelfieMulticlass','MI-GAN'],
+   photorealismVerified:false,androidVerified:false};
+ });
+ console.log('PHASE25 REAL TWO-STAGE REFERENCE TRANSFER '+JSON.stringify(previewStudy));
+ assert.equal(previewStudy.trials.length,4);
+ for(const trial of previewStudy.trials)if(trial.ok){
+  assert.equal(trial.exportAllowed,false);
+  assert.equal(trial.referenceHairstyleGenerated,false);
+ }
+ assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+ if(previewStudy.renderedComparison){
+  await page.screenshot({path:path.join(root,'ai/migan/reference-transfer-evidence.png'),fullPage:true});
+ }
+
  // Withdrawal must remove export permission and discard any previous proof.
  await page.locator('#approve').uncheck();
  assert.equal(await page.locator('#download').isDisabled(),true,

@@ -14,6 +14,9 @@ body.review-focus main>:not(#humanReview){display:none!important}
 body.review-focus #humanReview{margin-top:0;min-height:calc(100vh - 28px)}
 .review-context{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-width:650px;margin:10px auto 22px;gap:10px}
 .review-context canvas{max-height:240px;object-fit:contain}
+#reviewZoomPanel[hidden]{display:none!important}
+#reviewZoomPanel canvas{aspect-ratio:512/360;image-rendering:pixelated}
+#reviewZoomStatus{font-size:13px;color:var(--quiet);text-align:center}
 @media(max-width:650px){.vote-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:1fr}main{padding:19px 13px 60px}.panel{padding:13px}.viewer canvas{max-width:480px;margin:auto}}
 </style></head><body><main>
 <a href="../../index.html">← بازگشت به کاتالوگ</a>
@@ -81,6 +84,14 @@ body.review-focus #humanReview{margin-top:0;min-height:calc(100vh - 28px)}
 </div>
 <div class="review-pair"><div class="viewer"><div class="lbl">گزینهٔ A</div><canvas id="reviewCanvasA" width="512" height="512" aria-label="تصویر گزینهٔ آ"></canvas></div>
 <div class="viewer"><div class="lbl">گزینهٔ B</div><canvas id="reviewCanvasB" width="512" height="512" aria-label="تصویر گزینهٔ ب"></canvas></div></div>
+<div id="reviewZoomPanel" hidden>
+<p class="aside">نمای نزدیکِ مشترک از پیشانی و خط رویش مو؛ برشِ هر دو تصویر فقط از چهرهٔ اصلی محاسبه شده و بزرگ‌نمایی یکسان است. وضوح مصنوعی یا جزئیات جدید تولید نمی‌شود.</p>
+<div class="review-pair">
+<div class="viewer"><div class="lbl">خط موی گزینهٔ A — بزرگ‌نمایی ثابت</div><canvas id="reviewZoomA" width="512" height="360"></canvas></div>
+<div class="viewer"><div class="lbl">خط موی گزینهٔ B — بزرگ‌نمایی ثابت</div><canvas id="reviewZoomB" width="512" height="360"></canvas></div>
+</div>
+<p id="reviewZoomStatus">Close-up is locally rendered and never exported.</p>
+</div>
 <div id="reviewQuestions" aria-label="پرسش‌های مقایسهٔ تصویری"></div>
 <p class="review-status" id="reviewStatus" role="status" aria-live="polite">ابتدا انتقال مدل مو و آزمایش لبه را اجرا کنید.</p>
 <div class="actions"><button type="button" class="btn" id="reviewExport" disabled>ذخیرهٔ رأی‌های ناشناس، بدون عکس</button></div>
@@ -100,6 +111,7 @@ import {refineReferenceHairEdgeResearch} from './hair-boundary-refinement.mjs';
 import {auditHairEdgeRetention} from './hair-retention-risk.mjs';
 import {locateForeheadCutoutRisk} from './hairline-hotspot-audit.mjs';
 import {createBlindedHairReview,REVIEW_QUESTIONS} from './blind-human-review.mjs';
+import {deriveMatchedHairlineReviewCrop} from './hairline-review-crop.mjs';
 import {planTargetAwareRemoval} from './target-aware-repair.mjs';
 import {createOfflineDeviceEvidence} from './device-evidence.mjs';
 import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
@@ -121,6 +133,9 @@ function clearBlindReview(){
  $('reviewQuestions').replaceChildren();
  clearCanvas($('reviewCanvasA'));clearCanvas($('reviewCanvasB'));
  clearCanvas($('reviewSourcePortrait'));clearCanvas($('reviewReferencePortrait'));
+ clearCanvas($('reviewZoomA'));clearCanvas($('reviewZoomB'));
+ $('reviewZoomPanel').hidden=true;
+ $('reviewZoomStatus').textContent='Close-up is locally rendered and never exported.';
  $('reviewStatus').textContent='بازبینی با تغییر عکس یا رضایت حذف شد.';
  window.__hananehBlindReviewStage=null;
 }
@@ -174,7 +189,7 @@ async function prepareOffline(){
    './target-aware-repair.mjs','./device-evidence.mjs',
    './landmark-hair-warp.mjs','./local-reference-pair.mjs',
    './hair-boundary-refinement.mjs','./hair-retention-risk.mjs',
-   './hairline-hotspot-audit.mjs',
+   './hairline-hotspot-audit.mjs','./hairline-review-crop.mjs',
    './blind-human-review.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
@@ -550,7 +565,8 @@ function setReviewStatus(){
  window.__hananehBlindReviewStage={
   active:true,complete:state.complete,answeredCount:state.answeredCount,
   verifiedIndependentHumanRaters:false,
-  portraitExportAllowed:false,photoHashesExported:false
+  portraitExportAllowed:false,photoHashesExported:false,
+  hairlineZoomAvailable:!$('reviewZoomPanel').hidden
  };
 }
 $('reviewStart').addEventListener('click',()=>{
@@ -567,6 +583,23 @@ $('reviewStart').addEventListener('click',()=>{
  const methodB=reviewSession.candidateSide()==='B'?'softEdgePortrait':'transferPortrait';
  $('reviewCanvasA').getContext('2d').drawImage($(methodA),0,0,S,S);
  $('reviewCanvasB').getContext('2d').drawImage($(methodB),0,0,S,S);
+ const matchedCrop=deriveMatchedHairlineReviewCrop({
+  sourceFace:reviewSource.face,width:S,height:S
+ });
+ $('reviewZoomPanel').hidden=!matchedCrop.ok;
+ if(matchedCrop.ok){
+  for(const [id,source] of [['reviewZoomA',methodA],['reviewZoomB',methodB]]){
+   const dst=$(id),ctx=dst.getContext('2d');
+   ctx.imageSmoothingEnabled=false;
+   const r=matchedCrop.rect;
+   ctx.drawImage($(source),r.x,r.y,r.width,r.height,0,0,
+    dst.width,dst.height);
+  }
+  $('reviewZoomStatus').textContent=
+   'برش هر دو تصویر دقیقاً یکسان است و فقط برای داوری محلی در حافظه مانده است.';
+ }else{
+  $('reviewZoomStatus').textContent='قاب‌بندی ایمن خط مو ممکن نیست؛ نمای اصلی برای داوری باقی می‌ماند.';
+ }
  $('reviewSourcePortrait').getContext('2d').drawImage($('portrait'),0,0,S,S);
  $('reviewReferencePortrait').getContext('2d').drawImage($('referencePortrait'),0,0,S,S);
  document.body.classList.add('review-focus');

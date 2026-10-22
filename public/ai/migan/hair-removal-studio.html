@@ -366,7 +366,9 @@ $('softHairEdge').addEventListener('click',()=>{
   if(!zone.ok)throw Error('خط محافظ صورت نامعتبر است');
   const experiment=refineReferenceHairEdgeResearch({
    baseline:base,restoredRGBA:restored,semanticVeto:reviewSource.semanticVeto,
-   faceZones:zone.zones,width:S,height:S
+   faceZones:zone.zones,width:S,height:S,
+   sourceHairRGBA:reviewSource.sourceHairRGBA,keepMask:proposal.keepMask,
+   protectErasedHair:true,radius:3,strength:.20
   });
   if(!experiment.ok||experiment.exportAllowed!==false)
    throw Error('آزمایش لبه رد شد: '+experiment.reason);

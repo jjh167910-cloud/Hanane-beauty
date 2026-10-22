@@ -67,7 +67,7 @@ export function assessLocalHairAlphaLabel({
  let unknown=0,accepted=0,abstained=0,soft=0,softAccepted=0;
  let errorSum=0,errorSq=0,softError=0,aboveError=0,protectedLabelConflict=0;
  let hardHairDisagree=0,hardBgDisagree=0;
- let fractionalTruthCount=0;
+ let fractionalTruthCount=0,protectedPixelCount=0;
  const heatmapRGBA=new Uint8ClampedArray(n*4);
  for(let i=0;i<n;i++){
   const k=i*4,t=trimap.trimap[i],gt=labelAlpha[i],
@@ -77,6 +77,7 @@ export function assessLocalHairAlphaLabel({
     !Number.isFinite(a)||a<0||a>1||(v!==0&&v!==1)||
     semanticVeto.guard[i]>1||faceZones[i]>2)
    return deny('Nonphysical mask/face/alpha data');
+  if(protectedFace)protectedPixelCount++;
   if(protectedFace&&t!==0)return deny('Predicted trimap changed protected facial skin');
   if(gt>.025&&gt<.975)fractionalTruthCount++;
   if(protectedFace&&gt>.05)protectedLabelConflict++;
@@ -109,6 +110,13 @@ export function assessLocalHairAlphaLabel({
  if(!unknown)return deny('No unknown hair-edge pixels to evaluate');
  if(!fractionalTruthCount)return deny('Label lacks any fractional opacity at the evaluated resolution');
  const coverage=accepted/unknown;
+ // A photograph mask whose alleged hair fills a large share of the
+ // protected face or the trimap's certain background is almost
+ // certainly not suitable for scoring. This warning NEVER changes
+ // the photo or declares a legitimate thin fringe anatomically wrong.
+ const severeFaceDisagreement=protectedLabelConflict>Math.max(128,.1*protectedPixelCount);
+ const severeBackgroundDisagreement=hardBgDisagree>Math.max(512,.12*n);
+ const grossMaskConflict=severeFaceDisagreement||severeBackgroundDisagreement;
  const metrics={
   totalPixels:n,unknownPixels:unknown,acceptedPixels:accepted,abstainedPixels:abstained,
   coverage,selectiveMAE:accepted?errorSum/accepted:null,
@@ -121,6 +129,11 @@ export function assessLocalHairAlphaLabel({
   definiteForegroundDisagreement:hardHairDisagree,
   definiteBackgroundDisagreement:hardBgDisagree,
   labelConflictsWithProtectedFacePixels:protectedLabelConflict,
+  protectedPixelCount,
+  protectedHairLabelConflictFraction:protectedPixelCount?
+   protectedLabelConflict/protectedPixelCount:0,
+  severeFaceDisagreement,severeBackgroundDisagreement,
+  qualityComparisonRejectedForMaskMismatch:grossMaskConflict,
   coverageErrorBothReported:true
  };
  return {
@@ -130,8 +143,13 @@ export function assessLocalHairAlphaLabel({
   userSuppliedGroundTruthSelfAttested:true,
   hairAlphaLabelIsExternallyVerified:false,
   actualPortraitHairlineQualityProven:false,
+  labelAlignmentIndependentlyVerified:false,
+  maskPlausibilityReviewRequired:grossMaskConflict,
+  scoreUsableAsHairQualityEvidence:false,
   syntheticTestFixture:false,
   metrics,heatmapRGBA,
-  warning:'Self-attested local label ONLY. This calculation cannot establish image ownership, independent annotation, subject identity, hair-only correctness or commercial rights. Protected-face/label conflicts are reported, not silently erased.'
+  warning:grossMaskConflict?
+   'Gross disagreement with protected facial skin or definite background. This PNG is unsuitable for quality claims until external frame alignment and annotation provenance are independently reviewed. No pixels were edited.':
+   'Self-attested local label ONLY. This calculation cannot establish image ownership, independent annotation, subject identity, hair-only correctness or commercial rights. Protected-face/label conflicts are reported, not silently erased.'
  };
 }

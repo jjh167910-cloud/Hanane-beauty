@@ -245,7 +245,8 @@ try{
   analyzed: first.observed.length,semanticComparisons:first.observed.map(x=>({
    id:x.id,hairIoU:x.semantic?.crossModel?.crossModelHairIoU,
    skinConflictFraction:x.semantic?.crossModel?.skinConflictFractionOfOriginalHair,
-   faceSkinPixels:x.semantic?.classCounts?.[3],verifiedGroundTruth:false})),
+   faceSkinPixels:x.semantic?.classCounts?.[3],reviewCounts:x.semantic?.review,
+   verifiedGroundTruth:false})),
    faceStability:first.faceStability,
   measurable:first.evaluations.filter(x=>x.counts).length,
   accepted:first.evaluations.filter(x=>x.accepted).length,rejected:first.evaluations.filter(x=>!x.accepted).length,

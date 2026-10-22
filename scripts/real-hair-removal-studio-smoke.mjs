@@ -114,6 +114,10 @@ try{
   assert.equal(proof.independentlyLabeledHairVerified,false);
   assert.equal(proof.trueHairAlphaQualityCertified,false);
   assert.equal(proof.rightsExternallyVerified,false);
+  assert.equal(proof.maskPlausibilityReviewRequired,true,
+   'Intentional synthetic diagonal mask must fail the face/background plausibility gate');
+  assert.equal(proof.scoreUsableAsHairQualityEvidence,false);
+  assert.equal(proof.metrics.qualityComparisonRejectedForMaskMismatch,true);
   assert.equal(proof.exportAllowed,false);
   assert.equal(proof.commercialReleaseAllowed,false);
   assert.equal(proof.metrics.unknownPixels,11284);

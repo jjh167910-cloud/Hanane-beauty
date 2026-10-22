@@ -6,6 +6,11 @@ on:
       - research/offline-generative-feasibility-2026-10-21
 permissions:
   contents: read
+# Prevent multiple obsolete research commits from competing for the same
+# limited CI resources; always verify the newest branch state in full.
+concurrency:
+  group: hananeh-offhair-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build-and-test:
     runs-on: ubuntu-latest

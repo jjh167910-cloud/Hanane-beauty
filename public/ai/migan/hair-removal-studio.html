@@ -34,6 +34,10 @@
 </select><button class="btn" id="previewTransfer" disabled>نمایش پیش‌نمایش پژوهشی</button></div>
 <div class="split"><div class="viewer"><div class="lbl">مدل موی مرجع</div><canvas id="referencePortrait" width="512" height="512"></canvas></div>
 <div class="viewer"><div class="lbl">ترکیب آزمایشی؛ کیفیت آرایشگاهی تأیید نشده</div><canvas id="transferPortrait" width="512" height="512"></canvas></div></div>
+<div class="actions"><button type="button" class="btn soft" id="targetAware" disabled>مقایسه بازسازی هدفمند (پژوهشی)</button></div>
+<div class="viewer"><div class="lbl">بازسازی هدفمند زیر مدل مو — آزمایشی و غیرقابل دانلود</div>
+<canvas id="targetAwarePortrait" width="512" height="512"></canvas></div>
+<pre id="targetMetrics">No approved photorealistic hair generation</pre>
 <p id="transferStatus" role="status" aria-live="polite">ابتدا بازسازی عصبی مرحلهٔ سوم را اجرا کنید.</p>
 <pre id="transferMetrics">No reference transfer generated · research only</pre></section>
 </main><script src="../../data/pack-01.js"></script><script src="./ort/ort.min.js"></script><script type="module">
@@ -41,15 +45,20 @@ import {getLocalHairSegmenter} from '../hair-segmenter.mjs';
 import {getLocalMulticlassSegmenter} from '../offhair-multiclass-baseline.mjs';
 import {createSemanticSkinVeto} from './semantic-skin-veto.mjs';
 import {composeReferenceHairResearch} from './reference-transfer-research.mjs';
+import {planTargetAwareRemoval} from './target-aware-repair.mjs';
 import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
 import {prepareHairRemoval,composeInpaintedRGBA} from './hair-removal-core.mjs';
 const S=512,N=S*S,$=id=>document.getElementById(id);
-let imageData=null,proposal=null,token=0,transferToken=0,sessionPromise=null,reviewSource=null;
+let imageData=null,proposal=null,token=0,transferToken=0,sessionPromise=null,reviewSource=null,lastTransferReference=null;
 let originalCanvas=$('portrait'),maskCanvas=$('mask'),beforeCanvas=$('before'),afterCanvas=$('after');
 const clearCanvas=c=>{const x=c.getContext('2d');x.clearRect(0,0,S,S);x.fillStyle='#f1e5d7';x.fillRect(0,0,S,S)};
 function status(t,error=false){$('status').textContent=t;$('status').className=error?'error':'';}
 function clearTransfer(){
- transferToken++;$('previewTransfer').disabled=true;clearCanvas($('referencePortrait'));
+ transferToken++;lastTransferReference=null;
+ $('targetAware').disabled=true;clearCanvas($('targetAwarePortrait'));
+ window.__hananehTargetAwareStage=null;
+ $('targetMetrics').textContent='No approved photorealistic hair generation';
+ $('previewTransfer').disabled=true;clearCanvas($('referencePortrait'));
  clearCanvas($('transferPortrait'));window.__hananehTransferStage=null;
  $('transferStatus').textContent='ابتدا بازسازی عصبی مرحلهٔ سوم را اجرا کنید.';
  $('transferMetrics').textContent='No reference transfer generated · research only';
@@ -148,7 +157,7 @@ async function analyze(){
    analysis.face,{semanticVeto:veto,faceZones:landmarks.zones});
   if(!result.ok)throw Error('پردازش ایمن نیست: '+result.reason);
   proposal=result;
-  reviewSource={face:analysis.face,
+  reviewSource={face:analysis.face,faceZones:landmarks.zones,
    sourceHairRGBA:ctx.getImageData(0,0,S,S).data,semanticVeto:veto};
   const copy=new ImageData(new Uint8ClampedArray(imageData.data),S,S);
   for(let i=0;i<N;i++)if(proposal.keepMask[i]===0){
@@ -249,6 +258,83 @@ async function inpaint(){
  finally{if(key===token)$('run').disabled=!(proposal&&$('approve').checked);}
 }
 $('run').addEventListener('click',inpaint);
+$('targetAware').addEventListener('click',async()=>{
+ if(!lastTransferReference||!imageData||!proposal||!reviewSource||
+  !window.__hananehTransferStage?.ok||!$('approve').checked)return;
+ const key=token,refKey=transferToken;
+ $('targetAware').disabled=true;
+ $('transferStatus').textContent='در حال بازسازی هدفمند با مدل آفلاین واقعی...';
+ try{
+  const plan=planTargetAwareRemoval({
+   approvedKeepMask:proposal.keepMask,
+   referenceHairRGBA:lastTransferReference.hair,
+   sourceFace:reviewSource.face,referenceFace:lastTransferReference.face,
+   semanticVeto:reviewSource.semanticVeto,faceZones:reviewSource.faceZones,
+   width:S,height:S
+  });
+  if(!plan.ok)throw Error('ماسک هدفمند ایمن نیست: '+plan.reason);
+  let reworked=new Uint8ClampedArray(imageData.data),inferenceMs=0;
+  if(plan.requiresInpainting){
+   const session=await getSession();
+   if(key!==token||refKey!==transferToken||!$('approve').checked)return;
+   const rgb=new Uint8Array(N*3);
+   for(let i=0;i<N;i++)for(let c=0;c<3;c++)rgb[c*N+i]=imageData.data[i*4+c];
+   const start=performance.now();
+   const predictions=await session.run({
+    image:new ort.Tensor('uint8',rgb,[1,3,S,S]),
+    mask:new ort.Tensor('uint8',plan.keepMask,[1,1,S,S])
+   });
+   inferenceMs=Math.round(performance.now()-start);
+   if(key!==token||refKey!==transferToken||!$('approve').checked)return;
+   const tensor=predictions[session.outputNames[0]];
+   if(tensor.type!=='uint8'||tensor.dims.join(',')!=='1,3,512,512')
+    throw Error('Unexpected offline reconstruction tensor');
+   reworked=composeInpaintedRGBA(imageData.data,tensor.data,plan.keepMask,S,S).rgba;
+  }
+  const result=composeReferenceHairResearch({
+   sourceRGBA:imageData.data,restoredRGBA:reworked,
+   sourceHairRGBA:reviewSource.sourceHairRGBA,
+   referenceRGBA:lastTransferReference.rgba,
+   referenceHairRGBA:lastTransferReference.hair,
+   keepMask:plan.keepMask,semanticVeto:reviewSource.semanticVeto,
+   sourceFace:reviewSource.face,referenceFace:lastTransferReference.face,
+   width:S,height:S,allowNoInpainting:!plan.requiresInpainting
+  });
+  if(key!==token||refKey!==transferToken||!$('approve').checked)return;
+  if(!result.ok||result.exportAllowed!==false)
+   throw Error('ترکیب دو مرحله‌ای رد شد: '+result.reason);
+  let comparisonChangedPixels=0;
+  const baseline=$('transferPortrait').getContext('2d').getImageData(0,0,S,S).data;
+  for(let i=0;i<N;i++){
+   const k=4*i;
+   if(result.rgba[k]!==baseline[k]||result.rgba[k+1]!==baseline[k+1]||
+     result.rgba[k+2]!==baseline[k+2])comparisonChangedPixels++;
+  }
+  $('targetAwarePortrait').getContext('2d').putImageData(new ImageData(result.rgba,S,S),0,0);
+  const metrics={ok:true,previewOnly:true,exportAllowed:false,
+   oldRemovalPixels:plan.originalRemovalPixels,
+   targetRemovalPixels:plan.targetRemovalPixels,
+   unnecessaryErasureAvoided:plan.skippedHiddenPixels,
+   removalReductionFraction:plan.reductionFraction,
+   comparisonChangedPixels,inferenceMs,
+   diagnosticFlags:result.diagnosticFlags,
+   hasHumanVisualQualityApproval:false,phoneRuntimeVerified:false};
+  window.__hananehTargetAwareStage=metrics;
+  $('targetMetrics').textContent=JSON.stringify(metrics,null,2);
+  $('transferStatus').textContent='مقایسه پژوهشی آماده است؛ کیفیت چهره و مو برای مشتری تأیید نشده است.';
+ }catch(error){
+  if(key===token&&refKey===transferToken){
+   clearCanvas($('targetAwarePortrait'));
+   window.__hananehTargetAwareStage={ok:false,exportAllowed:false,
+    reason:String(error.message||error)};
+   $('targetMetrics').textContent=JSON.stringify(window.__hananehTargetAwareStage,null,2);
+   $('transferStatus').textContent='نتیجه رد شد: '+String(error.message||error);
+  }
+ }finally{
+  if(key===token&&refKey===transferToken&&window.__hananehTransferStage?.ok&&$('approve').checked)
+   $('targetAware').disabled=false;
+ }
+});
 $('download').addEventListener('click',()=>{
  const a=document.createElement('a');a.href=afterCanvas.toDataURL('image/png');a.download='hananeh-hair-removal-research.png';a.click();
 });
@@ -297,6 +383,10 @@ $('previewTransfer').addEventListener('click',async()=>{
    generatedNewHair:false,counts:result.counts,measures:result.measures,
    diagnosticFlags:result.diagnosticFlags};
   window.__hananehTransferStage=metadata;
+  lastTransferReference={face:detection.face,
+   rgba:ctx.getImageData(0,0,S,S).data,
+   hair:mask.getContext('2d').getImageData(0,0,S,S).data};
+  $('targetAware').disabled=false;
   $('transferMetrics').textContent=JSON.stringify(metadata,null,2);
   $('transferStatus').textContent='پیش‌نمایش پژوهشی آماده است؛ نتیجه برای مشتری یا دانلود تأیید نشده است.';
  }catch(err){

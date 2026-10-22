@@ -4,7 +4,13 @@
 <style>
 :root{--paper:#fffefa;--bg:#f5f0e9;--ink:#2f271f;--quiet:#786d5f;--gold:#9a7044;--line:#e7dbca;--error:#922f2b}
 *{box-sizing:border-box}body{background:var(--bg);color:var(--ink);font:15px/1.85 Tahoma,'Noto Sans Arabic',sans-serif;margin:0}a{color:var(--gold)}main{max-width:1080px;margin:auto;padding:26px 17px 75px}h1{font-size:clamp(24px,4vw,39px);line-height:1.4;margin:12px 0}h2{font-size:18px;margin:0 0 12px}p{color:var(--quiet);margin:10px 0}.eyebrow{letter-spacing:.05em;color:var(--gold);font-weight:700;font-size:12px}.panel{border:1px solid var(--line);background:var(--paper);border-radius:19px;padding:18px;margin:18px 0;box-shadow:0 10px 25px #543a200b}.split{display:grid;grid-template-columns:1fr 1fr;gap:16px}.viewer{min-width:0}canvas{display:block;background:#ede4d9;border:1px solid var(--line);border-radius:12px;width:100%;height:auto;aspect-ratio:1/1}.lbl{color:var(--quiet);font-size:12px;margin-bottom:8px}.actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}.btn{background:#342b23;color:white;border:0;padding:13px 19px;border-radius:12px;font:inherit;cursor:pointer}.btn.soft{background:#e9dfd2;color:#3b3127}.btn:disabled{opacity:.42;cursor:not-allowed}input[type=file]{width:100%;max-width:410px;padding:12px;border:1px dashed #ac9379;border-radius:10px}label{display:block;margin:8px 0}.inline-label{display:flex;align-items:center;gap:9px}.steps{display:flex;gap:12px;flex-wrap:wrap;color:var(--quiet);font-size:13px}.step{background:#f0e7db;padding:6px 10px;border-radius:99px}#status{font-weight:700;color:#705130;min-height:30px}#status.error{color:var(--error)}pre{direction:ltr;text-align:left;background:#ebe5dc;border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;font:12px/1.7 ui-monospace,monospace}.aside{font-size:12px;padding:12px;background:#f5e9dc;border-radius:10px}select{border:1px solid var(--line);padding:11px;border-radius:10px;background:white;max-width:100%}
-@media(max-width:650px){.split{grid-template-columns:1fr}main{padding:19px 13px 60px}.panel{padding:13px}.viewer canvas{max-width:480px;margin:auto}}
+.review-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;direction:ltr}.review-pair .viewer{text-align:center}
+.review-question{border:1px solid var(--line);border-radius:13px;padding:10px 12px;margin:12px 0}
+.review-question legend{font-size:14px;font-weight:700;padding:0 8px}.vote-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.vote-actions button{padding:10px 5px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);font:inherit;font-size:12px;cursor:pointer}
+.vote-actions button[aria-pressed=true]{border-color:#735531;background:#f5e7d2;font-weight:700}
+.review-status{font-size:13px;color:var(--quiet)}
+@media(max-width:650px){.vote-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:1fr}main{padding:19px 13px 60px}.panel{padding:13px}.viewer canvas{max-width:480px;margin:auto}}
 </style></head><body><main>
 <a href="../../index.html">← بازگشت به کاتالوگ</a>
 <div class="eyebrow">HANANEH BEAUTY · OFFLINE RESEARCH</div>
@@ -56,7 +62,18 @@
 <pre id="targetMetrics">No approved photorealistic hair generation</pre>
 <p id="transferStatus" role="status" aria-live="polite">ابتدا بازسازی عصبی مرحلهٔ سوم را اجرا کنید.</p>
 <pre id="transferMetrics">No reference transfer generated · research only</pre></section>
-<section class="panel"><h2>۵. گزارش فنیِ ناشناس برای تست روی گوشی</h2>
+<section class="panel" id="humanReview"><h2>۵. مقایسهٔ چشمی تصادفی و آفلاین — صرفاً پژوهشی</h2>
+<p class="aside">پس از ساخت پیش‌نمایش و نسخهٔ لبهٔ نرم، دو تصویر با ترتیب تصادفی A و B نشان داده می‌شوند. هیچ امتیازی توسط هوش مصنوعی یا تست خودکار به‌جای داور انسانی ثبت نمی‌شود. اگر خودتان روش‌ها را دیده‌اید، این ارزیابی «کورِ مستقل» محسوب نمی‌شود. برای بررسی مدل مو، عکس اصلی و مرجع را از بخش‌های بالا ببینید.</p>
+<div class="actions"><button type="button" class="btn soft" id="reviewStart" disabled>شروع مقایسهٔ تصادفی</button>
+<button type="button" class="btn soft" id="reviewDiscard" disabled>حذف رأی‌ها از حافظه</button></div>
+<div class="review-pair"><div class="viewer"><div class="lbl">گزینهٔ A</div><canvas id="reviewCanvasA" width="512" height="512" aria-label="تصویر گزینهٔ آ"></canvas></div>
+<div class="viewer"><div class="lbl">گزینهٔ B</div><canvas id="reviewCanvasB" width="512" height="512" aria-label="تصویر گزینهٔ ب"></canvas></div></div>
+<div id="reviewQuestions" aria-label="پرسش‌های مقایسهٔ تصویری"></div>
+<p class="review-status" id="reviewStatus" role="status" aria-live="polite">ابتدا انتقال مدل مو و آزمایش لبه را اجرا کنید.</p>
+<div class="actions"><button type="button" class="btn" id="reviewExport" disabled>ذخیرهٔ رأی‌های ناشناس، بدون عکس</button></div>
+<p class="aside">فایل JSON فقط انتخاب‌های دستی، شناسه‌های تصادفی و برچسب‌گذاری جایگاه A/B را ثبت می‌کند. شامل عکس، چهره، نام فایل یا هش واقعی عکس نیست؛ رضایت قانونی، استقلال داور یا کیفیت آرایشگاهی را تأیید نمی‌کند.</p>
+</section>
+<section class="panel"><h2>۶. گزارش فنیِ ناشناس برای تست روی گوشی</h2>
 <p class="aside">پس از اجرای مدل، می‌توانید یک فایل JSON شامل فقط زمان اجرا، شمارش پیکسل‌ها و وضعیت آفلاین مرورگر روی دستگاه خود ذخیره کنید. هیچ تصویر، نقشهٔ صورت، نام فایل، اطلاعات مکانی یا شناسهٔ گوشی ذخیره یا ارسال نمی‌شود. این گزارش کیفیت آرایشگاهی یا حافظهٔ واقعی سیستم را تأیید نمی‌کند.</p>
 <div class="actions"><button type="button" class="btn soft" id="deviceEvidence" disabled>ذخیره گزارش فنی بدون عکس</button></div>
 <p id="deviceEvidenceStatus" role="status" aria-live="polite">پس از بازسازی عصبی، گزارش عملکرد دستگاه فعال می‌شود.</p></section>
@@ -68,17 +85,30 @@ import {composeReferenceHairResearch} from './reference-transfer-research.mjs';
 import {inspectLocalReferencePair} from './local-reference-pair.mjs';
 import {refineReferenceHairEdgeResearch} from './hair-boundary-refinement.mjs';
 import {auditHairEdgeRetention} from './hair-retention-risk.mjs';
+import {createBlindedHairReview,REVIEW_QUESTIONS} from './blind-human-review.mjs';
 import {planTargetAwareRemoval} from './target-aware-repair.mjs';
 import {createOfflineDeviceEvidence} from './device-evidence.mjs';
 import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
 import {prepareHairRemoval,composeInpaintedRGBA} from './hair-removal-core.mjs';
 const S=512,N=S*S,$=id=>document.getElementById(id);
 let imageData=null,proposal=null,token=0,transferToken=0,sessionPromise=null,reviewSource=null,lastTransferReference=null;
-let localReferenceRGBA=null,referenceLoadToken=0;
+let localReferenceRGBA=null,referenceLoadToken=0,reviewSession=null;
 let originalCanvas=$('portrait'),maskCanvas=$('mask'),beforeCanvas=$('before'),afterCanvas=$('after');
 const clearCanvas=c=>{const x=c.getContext('2d');x.clearRect(0,0,S,S);x.fillStyle='#f1e5d7';x.fillRect(0,0,S,S)};
 function status(t,error=false){$('status').textContent=t;$('status').className=error?'error':'';}
+function clearBlindReview(){
+ if(reviewSession)reviewSession.destroy();
+ reviewSession=null;
+ $('reviewStart').disabled=true;
+ $('reviewDiscard').disabled=true;
+ $('reviewExport').disabled=true;
+ $('reviewQuestions').replaceChildren();
+ clearCanvas($('reviewCanvasA'));clearCanvas($('reviewCanvasB'));
+ $('reviewStatus').textContent='بازبینی با تغییر عکس یا رضایت حذف شد.';
+ window.__hananehBlindReviewStage=null;
+}
 function clearTransfer(){
+ clearBlindReview();
  transferToken++;lastTransferReference=null;
  $('landmarkWarp').disabled=true;
  $('softHairEdge').disabled=true;
@@ -123,6 +153,7 @@ async function prepareOffline(){
    './target-aware-repair.mjs','./device-evidence.mjs',
    './landmark-hair-warp.mjs','./local-reference-pair.mjs',
    './hair-boundary-refinement.mjs','./hair-retention-risk.mjs',
+   './blind-human-review.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
    '../models/hair_segmenter.tflite','../models/blaze_face_short_range.tflite',
@@ -347,6 +378,7 @@ $('softHairEdge').addEventListener('click',()=>{
  if(!imageData||!proposal||!reviewSource||!lastTransferReference||
   !window.__hananehTransferStage?.ok||!$('approve').checked)return;
  $('softHairEdge').disabled=true;
+ clearBlindReview();
  const report={ok:false,exportAllowed:false,photorealismVerified:false,
   referenceHairstyleGenerated:false};
  try{
@@ -414,8 +446,82 @@ $('softHairEdge').addEventListener('click',()=>{
   $('transferStatus').textContent='نرم‌سازی لبهٔ مو رد شد: '+report.reason;
  }
  window.__hananehEdgeStage=report;
+ $('reviewStart').disabled=!(report.ok&&window.__hananehTransferStage?.ok&&$('approve').checked);
  $('softEdgeMetrics').textContent=JSON.stringify(report,null,2);
  $('softHairEdge').disabled=!(window.__hananehTransferStage?.ok&&$('approve').checked);
+});
+const randomHex=bytes=>{
+ const a=crypto.getRandomValues(new Uint8Array(bytes));
+ return Array.from(a,b=>b.toString(16).padStart(2,'0')).join('');
+};
+function setReviewStatus(){
+ if(!reviewSession)return;
+ const state=reviewSession.view();
+ $('reviewStatus').textContent=state.complete?
+  'همهٔ چهار سؤال با انتخاب مستقیم داور پاسخ داده شده‌اند؛ می‌توان فایل متادیتا را ذخیره کرد.':
+  state.answeredCount+' از '+state.totalQuestions+' پاسخ ثبت شده است؛ هیچ تصویر ذخیره یا ارسال نشده است.';
+ $('reviewExport').disabled=!state.complete||state.closed;
+ window.__hananehBlindReviewStage={
+  active:true,complete:state.complete,answeredCount:state.answeredCount,
+  verifiedIndependentHumanRaters:false,
+  portraitExportAllowed:false,photoHashesExported:false
+ };
+}
+$('reviewStart').addEventListener('click',()=>{
+ if(!window.__hananehEdgeStage?.ok||!window.__hananehTransferStage?.ok||
+  !reviewSource||!$('approve').checked)return;
+ clearBlindReview();
+ const randomByte=crypto.getRandomValues(new Uint8Array(1))[0];
+ reviewSession=createBlindedHairReview({
+  studyId:'study_'+randomHex(8),trialId:'trial_'+randomHex(8),
+  subjectId:'subject_'+randomHex(8),raterId:'rater_'+randomHex(8),
+  sourceTag:randomHex(32),referenceTag:randomHex(32),randomByte
+ });
+ const methodA=reviewSession.candidateSide()==='A'?'softEdgePortrait':'transferPortrait';
+ const methodB=reviewSession.candidateSide()==='B'?'softEdgePortrait':'transferPortrait';
+ $('reviewCanvasA').getContext('2d').drawImage($(methodA),0,0,S,S);
+ $('reviewCanvasB').getContext('2d').drawImage($(methodB),0,0,S,S);
+ const container=$('reviewQuestions');container.replaceChildren();
+ const opts=[['A','گزینهٔ A'],['B','گزینهٔ B'],['tie','برابر'],['cannot_judge','قابل قضاوت نیست']];
+ for(const question of REVIEW_QUESTIONS){
+  const field=document.createElement('fieldset');field.className='review-question';
+  const legend=document.createElement('legend');legend.textContent=question.fa;
+  field.appendChild(legend);
+  const controls=document.createElement('div');controls.className='vote-actions';
+  for(const [vote,label] of opts){
+   const button=document.createElement('button');
+   button.type='button';button.textContent=label;
+   button.dataset.question=question.id;button.dataset.vote=vote;
+   button.setAttribute('aria-pressed','false');
+   button.addEventListener('click',()=>{
+    if(!reviewSession||!$('approve').checked)return;
+    reviewSession.vote(question.id,vote);
+    for(const other of controls.children)other.setAttribute('aria-pressed',String(other===button));
+    setReviewStatus();
+   });
+   controls.appendChild(button);
+  }
+  field.appendChild(controls);container.appendChild(field);
+ }
+ $('reviewDiscard').disabled=false;$('reviewStart').disabled=false;
+ setReviewStatus();
+});
+$('reviewDiscard').addEventListener('click',()=>{
+ clearBlindReview();
+ $('reviewStart').disabled=!(window.__hananehEdgeStage?.ok&&window.__hananehTransferStage?.ok&&$('approve').checked);
+});
+$('reviewExport').addEventListener('click',()=>{
+ if(!reviewSession||!$('approve').checked||$('reviewExport').disabled)return;
+ // Explicit click is the only path to metadata export. No portrait buffer,
+ // Data URL, image digest, filename, user agent or device identifier.
+ const study=reviewSession.finalize();
+ const result=JSON.stringify(study,null,2)+'\n';
+ const url=URL.createObjectURL(new Blob([result],{type:'application/json'}));
+ const a=document.createElement('a');a.href=url;
+ a.download='hananeh-blind-comparison-anonymous.json';a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ $('reviewStatus').textContent='رأی‌ها بدون تصویر ذخیره شدند. داوری مستقل یا کیفیت نهایی تأیید نشده است.';
+ $('reviewExport').disabled=true;
 });
 $('targetAware').addEventListener('click',async()=>{
  if(!lastTransferReference||!imageData||!proposal||!reviewSource||

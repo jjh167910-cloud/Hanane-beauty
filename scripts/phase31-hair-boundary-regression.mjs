@@ -83,3 +83,33 @@ test('thin donor edges and image boundaries never create pixels outside mask',()
   assert.deepEqual(r.rgba.slice(i*4,i*4+4),x.restoredRGBA.slice(i*4,i*4+4));
  }
 });
+
+test('guarded softening never drops originally erased source hair below required coverage',()=>{
+ const q=fixture(),keepMask=new Uint8Array(N),sourceHairRGBA=new Uint8ClampedArray(N*4);
+ keepMask.fill(255);
+ const i=8*W+22;
+ q.baseline.opacity[i]=170;
+ keepMask[i]=0;sourceHairRGBA[4*i]=255;
+ const ordinary=refine({...q,radius:3,strength:.8});
+ const guarded=refine({...q,sourceHairRGBA,keepMask,
+  protectErasedHair:true,radius:3,strength:.8});
+ assert.equal(ordinary.ok,true);
+ assert.equal(guarded.ok,true,guarded.reason);
+ assert.ok(ordinary.opacity[i]<160,'Fixture should demonstrate exposure in naive feather');
+ assert.ok(guarded.opacity[i]>=160,'Previously erased hair must not re-expose scalp');
+ assert.ok(guarded.opacity[i]<=q.baseline.opacity[i]);
+ assert.equal(guarded.exportAllowed,false);
+ assert.equal(guarded.measures.protectErasedHair,true);
+ for(let k=0;k<N;k++){
+  assert.ok(guarded.opacity[k]<=q.baseline.opacity[k]);
+  if(!q.baseline.opacity[k]){
+   assert.deepEqual(guarded.rgba.slice(k*4,k*4+4),
+    q.restoredRGBA.slice(k*4,k*4+4));
+  }
+ }
+ const missing=refine({...q,protectErasedHair:true});
+ assert.equal(missing.ok,false);
+ const invalidMask=new Uint8Array(keepMask);invalidMask[i]=37;
+ assert.equal(refine({...q,sourceHairRGBA,keepMask:invalidMask,
+  protectErasedHair:true}).ok,false);
+});

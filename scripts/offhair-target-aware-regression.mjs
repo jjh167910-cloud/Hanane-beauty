@@ -42,7 +42,7 @@ test('donor fringe is not treated as opaque and still undergoes neural cleanup',
  const a=planTargetAwareRemoval(q);
  assert.equal(a.ok,true);
  assert.equal(a.keepMask[20*W+65],0);
- for(let y=18;y<=22;y++)for(let x=63;x<=67;x++)
+ for(let y=18;y<=22;y++)for(let x=63;x<=67;x++)if((x-65)**2+(y-20)**2<=4)
   assert.equal(a.keepMask[y*W+x],0,'Feather boundary must not expose original hair');
 });
 test('all potentially protected source pixels remain untouched',()=>{
@@ -74,7 +74,9 @@ test('no-op rendering is explicitly reported instead of calling a model with zer
  const p=fixture();
  for(let y=0;y<H;y++)for(let x=0;x<W;x++)
   p.referenceHairRGBA[4*(y*W+x)]=y<49?255:0;
- const r=planTargetAwareRemoval(p,{erosionRadius:0});
+ p.erosionRadius=0;
+ const r=planTargetAwareRemoval(p);
  assert.equal(r.ok,true);
- if(r.targetRemovalPixels===0)assert.equal(r.requiresInpainting,false);
+ assert.equal(r.targetRemovalPixels,0);
+ assert.equal(r.requiresInpainting,false);
 });

@@ -299,6 +299,23 @@ try{
  assert.equal(uiTransfer.previewOnly,true);
  assert.equal(uiTransfer.exportAllowed,false);
  assert.equal(uiTransfer.generatedNewHair,false);
+ await page.locator('#referenceDecontam').click();
+ const liveDecontam=await page.evaluate(()=>window.__hananehDecontamStage);
+ assert.equal(liveDecontam.ok,true,'Real reference foreground estimation refused: '+liveDecontam.reason);
+ assert.equal(liveDecontam.exportAllowed,false);
+ assert.equal(liveDecontam.trueAlphaMeasured,false);
+ assert.equal(liveDecontam.hairlineGeometryStillUnresolved,true);
+ assert.equal(liveDecontam.protectedFacePixelsChanged,0);
+ assert.equal(liveDecontam.commercialReleaseAllowed,false);
+ assert.ok(liveDecontam.correctedReference.candidatePixels>=0);
+ assert.ok(liveDecontam.correctedReference.maxObservedChannelChange<=18);
+ assert.ok(liveDecontam.previewChangedPixels>=0);
+ console.log('PHASE37 REAL REFERENCE FOREGROUND COLOR STUDY '+JSON.stringify({
+  eligibleEdgePixels:liveDecontam.correctedReference.candidatePixels,
+  referencePixelsAdjusted:liveDecontam.correctedReference.pixelsChanged,
+  projectedPreviewChanges:liveDecontam.previewChangedPixels,
+  trueAlphaMeasured:false,faceEdits:0,humanQualityVerified:false,
+  exportAllowed:false}));
  await page.locator('#hairlineAudit').click();
  const liveHairline=await page.evaluate(()=>window.__hananehHairlineStage);
  assert.ok(liveHairline,'Forehead risk inspection did not run');
@@ -519,6 +536,11 @@ try{
  assert.equal(localPhotoPreview.differentPersonVerified,false);
  assert.equal(localPhotoPreview.referenceRightsIndependentlyVerified,false);
  assert.equal(localPhotoPreview.exportAllowed,false);
+ await page.locator('#referenceDecontam').click();
+ const localDecontam=await page.evaluate(()=>window.__hananehDecontamStage);
+ assert.equal(localDecontam.ok,true,'Local reference foreground study refused: '+localDecontam.reason);
+ assert.equal(localDecontam.exportAllowed,false);
+ assert.equal(localDecontam.trueAlphaMeasured,false);
  await page.locator('#hairlineAudit').click();
  const localHairline=await page.evaluate(()=>window.__hananehHairlineStage);
  assert.equal(localHairline.ok,true,'Local reference should allow face-protected hairline inspection: '+localHairline.reason);
@@ -550,6 +572,8 @@ try{
  assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null,
   'Revoked reference permission must discard prior matting result');
+ assert.equal(await page.evaluate(()=>window.__hananehDecontamStage),null);
+ assert.equal(await page.locator('#referenceDecontam').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehMicrotextureStage),null,
   'Revoked reference permission must erase all donor texture diagnostics');
  assert.equal(await page.locator('#hairTexture').isDisabled(),true);
@@ -579,6 +603,8 @@ try{
   'Revoked consent must erase previous facial landmark fit diagnostics');
  assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null);
+ assert.equal(await page.evaluate(()=>window.__hananehDecontamStage),null);
+ assert.equal(await page.locator('#referenceDecontam').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehMicrotextureStage),null);
  assert.equal(await page.locator('#hairTexture').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehHairlineStage),null);
@@ -636,6 +662,16 @@ try{
   'Protected transfer pixel counts must match across online and offline inference');
  assert.deepEqual(offlinePreview.diagnosticFlags,uiTransfer.diagnosticFlags,
   'Offline reload must not conceal the same visual failure warnings');
+ await page.locator('#referenceDecontam').click();
+ const offlineDecontam=await page.evaluate(()=>window.__hananehDecontamStage);
+ assert.equal(offlineDecontam.ok,true,'Color estimation must work offline: '+offlineDecontam.reason);
+ assert.deepEqual(offlineDecontam.correctedReference,liveDecontam.correctedReference);
+ assert.equal(offlineDecontam.previewChangedPixels,liveDecontam.previewChangedPixels);
+ assert.equal(offlineDecontam.exportAllowed,false);
+ console.log('PHASE37 AIRPLANE MODE REFERENCE COLOR '+JSON.stringify({
+  deterministic:true,referencePixels:offlineDecontam.correctedReference.pixelsChanged,
+  previewPixels:offlineDecontam.previewChangedPixels,
+  portraitUpload:false,commercialExport:false}));
  await page.locator('#hairlineAudit').click();
  const offlineHairline=await page.evaluate(()=>window.__hananehHairlineStage);
  assert.equal(offlineHairline.ok,true,'Forehead diagnostic should work offline: '+offlineHairline.reason);
@@ -737,6 +773,12 @@ try{
  assert.equal(offlineLocalPreview.referenceFromLocalFile,true);
  assert.equal(offlineLocalPreview.exportAllowed,false);
  assert.equal(offlineLocalPreview.differentPersonVerified,false);
+ await page.locator('#referenceDecontam').click();
+ const offlineLocalDecontam=await page.evaluate(()=>window.__hananehDecontamStage);
+ assert.equal(offlineLocalDecontam.ok,true,'Local uploaded color study offline rejected: '+offlineLocalDecontam.reason);
+ assert.deepEqual(offlineLocalDecontam.correctedReference,localDecontam.correctedReference);
+ assert.equal(offlineLocalDecontam.previewChangedPixels,localDecontam.previewChangedPixels);
+ assert.equal(offlineLocalDecontam.exportAllowed,false);
  await page.locator('#hairlineAudit').click();
  const offlineLocalHairline=await page.evaluate(()=>window.__hananehHairlineStage);
  assert.equal(offlineLocalHairline.ok,true,'Local uploaded reference hairline audit must run offline');

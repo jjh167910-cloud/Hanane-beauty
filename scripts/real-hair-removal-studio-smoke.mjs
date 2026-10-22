@@ -318,6 +318,12 @@ try{
  // only, NEVER actual or independently collected human visual ratings.
  assert.equal(await page.locator('#reviewStart').isEnabled(),true);
  await page.locator('#reviewStart').click();
+ assert.equal(await page.evaluate(()=>document.body.classList.contains('review-focus')),true);
+ assert.equal(await page.locator('#transferPortrait').isVisible(),false,
+  'Method-labelled earlier panels must not remain visible during blinded evaluation');
+ assert.equal(await page.locator('#reviewSourcePortrait').isVisible(),true);
+ assert.equal(await page.locator('#reviewReferencePortrait').isVisible(),true);
+ assert.equal(await page.locator('#reviewExit').isEnabled(),true);
  assert.equal(await page.locator('#reviewExport').isDisabled(),true);
  assert.equal(await page.locator('#reviewQuestions fieldset').count(),4);
  assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage?.answeredCount),0);
@@ -357,6 +363,8 @@ try{
   recordedVotes:'automated abstentions only',humanVotesVerified:false,
   portraitExported:false,commercialApproval:false}));
  await page.locator('#reviewDiscard').click();
+ assert.equal(await page.evaluate(()=>document.body.classList.contains('review-focus')),false,
+  'Leaving a review destroys the focus mode and its images');
  assert.equal(await page.evaluate(()=>window.__hananehBlindReviewStage),null);
  assert.equal(await page.locator('#reviewExport').isDisabled(),true);
  assert.equal(await page.locator('#reviewStart').isEnabled(),true);
@@ -555,6 +563,9 @@ try{
  assert.deepEqual(offlineEdge.retentionRisk,liveEdge.retentionRisk,
   'Full airplane mode should reproduce coverage erosion and scalp-exposure warnings');
  await page.locator('#reviewStart').click();
+ assert.equal(await page.evaluate(()=>document.body.classList.contains('review-focus')),true);
+ assert.equal(await page.locator('#transferPortrait').isVisible(),false);
+ assert.equal(await page.locator('#reviewSourcePortrait').isVisible(),true);
  assert.equal(await page.locator('#reviewQuestions fieldset').count(),4,
   'Blind review controls must function after airplane-mode reload');
  assert.equal(await page.locator('#reviewExport').isDisabled(),true,

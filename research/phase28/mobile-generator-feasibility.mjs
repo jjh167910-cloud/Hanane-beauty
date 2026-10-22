@@ -70,7 +70,7 @@ export function evaluateMobileGeneratorPack(candidate,policy=DEFAULTS){
  if(!q||q.independentSubjectCount<policy.minIndependentSubjects||
    q.blindedHumanFidelityApproved!==true||
    q.faceIdentityIndependentReviewPassed!==true||
-   q.hairlineArtifactsReviewed===false||q.hairlineArtifactsReviewed===undefined)
+   q.hairlineArtifactsReviewed===undefined)
    failures.push(reason('INDEPENDENT_QUALITY','Missing enough independently consented human-reviewed portrait results'));
  if(q?.hairlineArtifactsReviewed!==true)
    failures.push(reason('HAIRLINE','Hairline/occlusion review not accepted'));

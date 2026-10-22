@@ -34,8 +34,11 @@ Phase 33 adds a **local collection interface**, not another invented score:
   after the rigid-transfer and guarded-edge previews exist.
   It copies both canvas images directly in memory and labels
   **only** 'A' and 'B'. The reviewer sees no method label next
-  to these two panels. Any previously seen method labels mean
-  the same viewer has **not** been independently blinded.
+  to these two panels. A dedicated focus mode hides all method-labeled
+  sections outside the review during voting, while displaying the
+  original source portrait and hairstyle reference as context.
+  Exiting focus mode can reveal the methods. Any previously seen
+  method labels mean the same viewer has **not** been independently blinded.
 - The image pixels stay in the existing memory-only page. No JPEG,
   screenshots, face landmarks, file names, session photos,
   precise device models or actual source-photo SHA256s are exported.

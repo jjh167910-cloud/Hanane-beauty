@@ -82,6 +82,30 @@ try{
  await page.locator('#hairTrimap').click();
  const firstTrimap=await page.evaluate(()=>window.__hananehHairTrimapStage);
  assert.equal(firstTrimap.ok,true,'Hair trimap construction failed: '+firstTrimap.reason);
+ assert.equal(await page.locator('#colorlineAlpha').isEnabled(),true);
+ await page.locator('#colorlineAlpha').click();
+ const firstColorline=await page.evaluate(()=>window.__hananehColorlineAlphaStage);
+ assert.equal(firstColorline.ok,true,'Real color-line hair alpha failed: '+firstColorline.reason);
+ assert.equal(firstColorline.exportAllowed,false);
+ assert.equal(firstColorline.alphaGroundTruth,false);
+ assert.equal(firstColorline.neuralHairMattingExecuted,false);
+ assert.equal(firstColorline.licensedNeuralMattingWeightsUsed,false);
+ assert.equal(firstColorline.referencePortraitEdited,false);
+ assert.equal(firstColorline.protectedFacePixelsChanged,0);
+ assert.equal(firstColorline.metrics.unknownPixels,firstTrimap.metrics.unknown);
+ assert.equal(firstColorline.metrics.resolvedUnknownPixels+
+   firstColorline.metrics.unresolvedUnknownPixels,firstTrimap.metrics.unknown);
+ assert.ok(firstColorline.metrics.resolvedUnknownPixels>=0);
+ assert.ok(firstColorline.metrics.unknownResolvedFraction>=0&&
+   firstColorline.metrics.unknownResolvedFraction<=1);
+ console.log('PHASE40 ACTUAL CLASSICAL HAIR ALPHA STUDY '+JSON.stringify({
+  unknown: firstColorline.metrics.unknownPixels,
+  supportedAlpha: firstColorline.metrics.resolvedUnknownPixels,
+  fractionalAlpha: firstColorline.metrics.fractionalUnknownPixels,
+  abstentions: firstColorline.metrics.unresolvedUnknownPixels,
+  meanColorResidual: firstColorline.metrics.averageAcceptedRGBLineResidual,
+  independentlyValidatedHairAlpha:false,
+  modelWeightsUsed:0,customerExport:false}));
  assert.equal(firstTrimap.estimatedHairAlpha,false);
  assert.equal(firstTrimap.neuralHairMattingExecuted,false);
  assert.equal(firstTrimap.exportAllowed,false);
@@ -617,6 +641,9 @@ try{
  assert.equal(await page.locator('#portraitMatte').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehHairTrimapStage),null);
  assert.equal(await page.locator('#hairTrimap').isDisabled(),true);
+ assert.equal(await page.evaluate(()=>window.__hananehColorlineAlphaStage),null,
+  'Photo consent withdrawal must erase prior fractional hair-alpha results');
+ assert.equal(await page.locator('#colorlineAlpha').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehMicrotextureStage),null,
   'Revoked reference permission must erase all donor texture diagnostics');
  assert.equal(await page.locator('#hairTexture').isDisabled(),true);
@@ -675,6 +702,7 @@ try{
     '/ai/migan/models/portrait-modnet-fp16.onnx',
     '/ai/migan/portrait-modnet-neural-audit.mjs',
     '/ai/migan/guarded-hair-trimap.mjs',
+    '/ai/migan/hair-alpha-colorline-research.mjs',
     ...manifest.parts.map(p=>'/ai/migan/parts/'+p.name)];
    return {files:files.length,present:await Promise.all(files.map(async p=>!!(await cache.match(p))))};
  });
@@ -695,6 +723,19 @@ try{
  await page.locator('#hairTrimap').click();
  const offlineTrimap=await page.evaluate(()=>window.__hananehHairTrimapStage);
  assert.equal(offlineTrimap.ok,true,'Face-safe hair trimap must run airplane mode: '+offlineTrimap.reason);
+ await page.locator('#colorlineAlpha').click();
+ const offlineColorline=await page.evaluate(()=>window.__hananehColorlineAlphaStage);
+ assert.equal(offlineColorline.ok,true,
+  'Classical hair opacity inference must run airplane mode: '+offlineColorline.reason);
+ assert.deepEqual(offlineColorline.metrics,firstColorline.metrics,
+  'Offline reloaded hair alpha must give exactly same supported/abstained counts');
+ assert.equal(offlineColorline.exportAllowed,false);
+ assert.equal(offlineColorline.neuralHairMattingExecuted,false);
+ console.log('PHASE40 AIRPLANE MODE HAIR ALPHA STUDY '+JSON.stringify({
+  identicalMetrics:true,unknownPixelCount:offlineColorline.metrics.unknownPixels,
+  resolved:offlineColorline.metrics.resolvedUnknownPixels,
+  abstained:offlineColorline.metrics.unresolvedUnknownPixels,
+  commercialApproval:false}));
  assert.deepEqual(offlineTrimap.metrics,firstTrimap.metrics);
  assert.equal(offlineTrimap.estimatedHairAlpha,false);
  assert.equal(offlineTrimap.exportAllowed,false);

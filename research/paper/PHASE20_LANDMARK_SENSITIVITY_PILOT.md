@@ -6,7 +6,7 @@ Date: 2026-10-22. Study status: **exploratory engineering stress test / not a ca
 Phase 16's landmark-core mask marked 6 of 6 pilot source/reference pairings as geometrically admissible under a *provisional* rule (versus 1 of 6 for the original conservative face ellipse), but all six still required manual review. The broad ellipse and the smaller feature-core are not equivalent definitions of ground-truth safe pixels. It was therefore essential to test whether small landmark errors could substantially reclassify facial features.
 
 ## Implemented
-- `public/ai/offhair-landmark-stability.mjs`: deterministic 15-condition sensitivity sweep: centered mask; 8 global ±x/±y translations, plus eye-distance scale, nose offsets and ear offsets. Perturbations are scaled to **6% of the detector's horizontal eye distance** by default.
+- `public/ai/offhair-landmark-stability.mjs`: deterministic 15-condition sensitivity sweep: centered mask; 6 global ±x/±y/diagonal translations, plus eye-distance scale, nose offsets and ear offsets. Perturbations are scaled to **6% of the detector's horizontal eye distance** by default.
 - `scripts/offhair-landmark-stability-regression.mjs`: fail-closed tests for missing landmarks, mask mismatch, parameter errors, protected zones, reproducibility and zero-jitter controls.
 - `scripts/real-offhair-difference-mask-smoke.mjs`: genuine MediaPipe hair/face landmarks from five bundled catalog portraits, masks sampled at 128×128 for faster **research-only sensitivity screening**. Repeated after service worker controlled page reload with browser network disabled.
 - CI and original tests pass. The first CI trial exposed missing landmark validation; implementation was corrected to reject incomplete observations rather than crash.

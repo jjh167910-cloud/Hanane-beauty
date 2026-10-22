@@ -26,6 +26,8 @@ jobs:
         run: node scripts/real-browser-inference-smoke.mjs
       - name: Train and evaluate isolated synthetic pose-flow student (NO real images)
         run: npm run research:pose:synthetic
+      - name: Obtain pinned Apache-2.0 multiclass model for research only
+        run: npm run build:offhair:multiclass
       - name: Run real source/reference hair difference-mask topology offline experiment
         run: node scripts/real-offhair-difference-mask-smoke.mjs
       - name: Verify browser-local OffHair ground-truth drawing, metadata export and offline reload

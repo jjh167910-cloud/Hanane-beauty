@@ -191,6 +191,19 @@ try{
   assert.equal(trial.referenceHairstyleGenerated,false);
  }
  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+ const eligible=previewStudy.trials.find(x=>x.ok);
+ assert.ok(eligible,'No actual reference hairstyle could be conservatively previewed');
+ await page.locator('#referenceSample').selectOption(eligible.id);
+ await page.locator('#previewTransfer').click();
+ await page.waitForFunction(()=>window.__hananehTransferStage!==null,{timeout:60000});
+ const uiTransfer=await page.evaluate(()=>window.__hananehTransferStage);
+ assert.equal(uiTransfer.ok,true,
+  'Research UI must render the same real-source preview as the core: '+uiTransfer.reason);
+ assert.equal(uiTransfer.previewOnly,true);
+ assert.equal(uiTransfer.exportAllowed,false);
+ assert.equal(uiTransfer.generatedNewHair,false);
+ assert.equal(await page.locator('#download').isEnabled(),true,
+  'The separate research inpainting export may remain enabled only while consent is active');
  if(previewStudy.renderedComparison){
   await page.screenshot({path:path.join(root,'ai/migan/reference-transfer-evidence.png'),fullPage:true});
  }

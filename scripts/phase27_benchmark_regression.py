@@ -35,6 +35,9 @@ class Phase27GateTests(unittest.TestCase):
             (self.data/name).write_bytes(blob)
             self.case[key] = {"path":name,
                 "sha256":hashlib.sha256(blob).hexdigest()}
+        # Frozen two-person protocol: one reference image supplies both
+        # hairstyle shape and color; no unconsented third person is accepted.
+        self.case["color_image"] = dict(self.case["shape_image"])
         self.write()
 
     def write(self):
@@ -69,6 +72,15 @@ class Phase27GateTests(unittest.TestCase):
         self.case["source_subject_id"]="catalog-unverified-identity"
         self.write()
         self.assertNotEqual(self.run_gate().returncode,0)
+
+    def test_unconsented_third_color_reference_rejected(self):
+        blob=(b"\\xff\\xd8\\xff"+b"x"*5000)
+        name="unconsented-third.jpg"
+        (self.data/name).write_bytes(blob)
+        self.case["color_image"]={"path":name,
+          "sha256":hashlib.sha256(blob).hexdigest()}
+        self.write()
+        self.assertIn("SAME consented reference",self.run_gate().stderr)
 
     def test_duplicate_cases_rejected(self):
         self.manifest.write_text(json.dumps({"schema":"HANANEH-PHASE27-PAIR-v1",

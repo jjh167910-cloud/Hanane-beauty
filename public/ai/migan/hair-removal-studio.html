@@ -80,6 +80,8 @@ body.review-focus #humanReview{margin-top:0;min-height:calc(100vh - 28px)}
 <div class="viewer"><div class="lbl">خروجی واقعی مدل MODNet — ماتی کل شخص، نه ماسک واقعی تارهای مو</div>
 <canvas id="portraitMatteCanvas" width="512" height="512"></canvas></div>
 <pre id="portraitMatteMetrics">Full-person neural matte not yet evaluated · hair alpha ground truth unavailable</pre>
+<p class="aside">مدل MODNet فقط شفافیت کل شخص را تخمین می‌زند. این مدل، جداکنندهٔ دقیق تک‌تارهای مو نیست.
+<a href="../licenses/MODNET_PORTRAIT_NOTICE.txt">منبع مدل و مجوز Apache 2.0</a></p>
 <div class="viewer"><div class="lbl">بازسازی هدفمند زیر مدل مو — آزمایشی و غیرقابل دانلود</div>
 <canvas id="targetAwarePortrait" width="512" height="512"></canvas></div>
 <pre id="targetMetrics">No approved photorealistic hair generation</pre>
@@ -220,6 +222,7 @@ async function prepareOffline(){
    './reference-foreground-color-research.mjs',
    './portrait-modnet-neural-audit.mjs','./models/portrait-modnet-manifest.json',
    './models/portrait-modnet-fp16.onnx',
+   '../licenses/MODNET_PORTRAIT_NOTICE.txt','../licenses/Apache-2.0.txt',
    './hairline-hotspot-audit.mjs','./hairline-review-crop.mjs',
    './blind-human-review.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',

@@ -330,6 +330,25 @@ try{
  assert.equal(liveEdge.retentionRisk?.exportAllowed,false);
  assert.equal(liveEdge.retentionRisk?.humanHairQualityVerified,false);
  console.log('PHASE32 REAL HAIR RETENTION SAFETY CHECK '+JSON.stringify(liveEdge.retentionRisk));
+ await page.locator('#hairTexture').click();
+ const liveDetail=await page.evaluate(()=>window.__hananehMicrotextureStage);
+ assert.equal(liveDetail.ok,true,'Real donor microtexture rejected: '+liveDetail.reason);
+ assert.equal(liveDetail.exportAllowed,false);
+ assert.equal(liveDetail.referenceHairstyleGenerated,false);
+ assert.equal(liveDetail.photorealismVerified,false);
+ assert.equal(liveDetail.independentHumanReviewPassed,false);
+ assert.equal(liveDetail.possibleArtificialHairlineStillUnresolved,true);
+ assert.ok(liveDetail.metrics.consideredBoundaryPixels>=0);
+ assert.ok(liveDetail.metrics.changedPixels>=0);
+ assert.ok(liveDetail.metrics.maxObservedDelta<=9);
+ assert.equal(liveDetail.risk.criticallyExposedSourceHairPixels,0);
+ assert.equal(liveDetail.risk.proxyCheckPassed,true);
+ console.log('PHASE36 DONOR HAIRLINE MICROTEXTURE '+JSON.stringify({
+  treatedPixels:liveDetail.metrics.changedPixels,
+  inspectedBoundary:liveDetail.metrics.consideredBoundaryPixels,
+  donorOpacityRetained:liveDetail.risk.donorOpacityRetentionFraction,
+  gradientRatio:liveDetail.risk.gradientEnergyRatio,
+  qualityHumanVerified:false,commercialExport:false}));
  // Phase33: browser automation supplies synthetic abstentions for integration
  // only, NEVER actual or independently collected human visual ratings.
  assert.equal(await page.locator('#reviewStart').isEnabled(),true);
@@ -511,6 +530,11 @@ try{
  assert.ok(localEdge.changedPixels>0);
  assert.ok(localEdge.retentionRisk?.metrics?.donorOpacityRetentionFraction>0);
  assert.equal(localEdge.retentionRisk?.exportAllowed,false);
+ await page.locator('#hairTexture').click();
+ const localDetail=await page.evaluate(()=>window.__hananehMicrotextureStage);
+ assert.equal(localDetail.ok,true,'Uploaded hair reference texture experiment failed: '+localDetail.reason);
+ assert.equal(localDetail.exportAllowed,false);
+ assert.equal(localDetail.risk.criticallyExposedSourceHairPixels,0);
  await page.locator('#landmarkWarp').click();
  const localWarp=await page.evaluate(()=>window.__hananehLandmarkStage);
  assert.ok(localWarp,'Uploaded-photo warp must either succeed or explicitly refuse');
@@ -526,6 +550,9 @@ try{
  assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null,
   'Revoked reference permission must discard prior matting result');
+ assert.equal(await page.evaluate(()=>window.__hananehMicrotextureStage),null,
+  'Revoked reference permission must erase all donor texture diagnostics');
+ assert.equal(await page.locator('#hairTexture').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehHairlineStage),null,
   'Revoked reference permission must discard forehead hotspot diagnostics');
  assert.equal(await page.locator('#hairlineAudit').isDisabled(),true);
@@ -552,6 +579,8 @@ try{
   'Revoked consent must erase previous facial landmark fit diagnostics');
  assert.equal(await page.locator('#softHairEdge').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehEdgeStage),null);
+ assert.equal(await page.evaluate(()=>window.__hananehMicrotextureStage),null);
+ assert.equal(await page.locator('#hairTexture').isDisabled(),true);
  assert.equal(await page.evaluate(()=>window.__hananehHairlineStage),null);
  assert.equal(await page.locator('#hairlineAudit').isDisabled(),true);
  assert.equal(await page.locator('#reviewStart').isDisabled(),true);
@@ -623,6 +652,16 @@ try{
  assert.deepEqual(offlineEdge.boundaryProxy,liveEdge.boundaryProxy);
  assert.deepEqual(offlineEdge.retentionRisk,liveEdge.retentionRisk,
   'Full airplane mode should reproduce coverage erosion and scalp-exposure warnings');
+ await page.locator('#hairTexture').click();
+ const offlineDetail=await page.evaluate(()=>window.__hananehMicrotextureStage);
+ assert.equal(offlineDetail.ok,true,'In-mask detail audit must run offline: '+offlineDetail.reason);
+ assert.deepEqual(offlineDetail.metrics,liveDetail.metrics,
+  'Source reference texture microdetail must be deterministic in airplane mode');
+ assert.deepEqual(offlineDetail.risk,liveDetail.risk);
+ assert.equal(offlineDetail.exportAllowed,false);
+ console.log('PHASE36 AIRPLANE MODE REAL DONOR DETAIL '+JSON.stringify({
+  parity:true,changedPixels:offlineDetail.metrics.changedPixels,
+  noScalpExposure:offlineDetail.risk.criticallyExposedSourceHairPixels===0}));
  await page.locator('#reviewStart').click();
  assert.equal(await page.evaluate(()=>document.body.classList.contains('review-focus')),true);
  assert.equal(await page.locator('#transferPortrait').isVisible(),false);
@@ -710,6 +749,12 @@ try{
  assert.deepEqual(offlineLocalEdge.boundaryProxy,localEdge.boundaryProxy);
  assert.deepEqual(offlineLocalEdge.retentionRisk,localEdge.retentionRisk);
  assert.equal(offlineLocalEdge.exportAllowed,false);
+ await page.locator('#hairTexture').click();
+ const offlineLocalDetail=await page.evaluate(()=>window.__hananehMicrotextureStage);
+ assert.equal(offlineLocalDetail.ok,true,'Local reference texture must run offline: '+offlineLocalDetail.reason);
+ assert.deepEqual(offlineLocalDetail.metrics,localDetail.metrics);
+ assert.deepEqual(offlineLocalDetail.risk,localDetail.risk);
+ assert.equal(offlineLocalDetail.exportAllowed,false);
  assert.deepEqual(offlineLocalPreview.counts,localPhotoPreview.counts,
   'Online and offline file picker must yield the exact same counted hair pixels');
  await page.locator('#referenceConsent').uncheck();

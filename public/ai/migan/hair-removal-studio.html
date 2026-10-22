@@ -40,12 +40,17 @@
 <pre id="targetMetrics">No approved photorealistic hair generation</pre>
 <p id="transferStatus" role="status" aria-live="polite">ابتدا بازسازی عصبی مرحلهٔ سوم را اجرا کنید.</p>
 <pre id="transferMetrics">No reference transfer generated · research only</pre></section>
+<section class="panel"><h2>۵. گزارش فنیِ ناشناس برای تست روی گوشی</h2>
+<p class="aside">پس از اجرای مدل، می‌توانید یک فایل JSON شامل فقط زمان اجرا، شمارش پیکسل‌ها و وضعیت آفلاین مرورگر روی دستگاه خود ذخیره کنید. هیچ تصویر، نقشهٔ صورت، نام فایل، اطلاعات مکانی یا شناسهٔ گوشی ذخیره یا ارسال نمی‌شود. این گزارش کیفیت آرایشگاهی یا حافظهٔ واقعی سیستم را تأیید نمی‌کند.</p>
+<div class="actions"><button type="button" class="btn soft" id="deviceEvidence" disabled>ذخیره گزارش فنی بدون عکس</button></div>
+<p id="deviceEvidenceStatus" role="status" aria-live="polite">پس از بازسازی عصبی، گزارش عملکرد دستگاه فعال می‌شود.</p></section>
 </main><script src="../../data/pack-01.js"></script><script src="./ort/ort.min.js"></script><script type="module">
 import {getLocalHairSegmenter} from '../hair-segmenter.mjs';
 import {getLocalMulticlassSegmenter} from '../offhair-multiclass-baseline.mjs';
 import {createSemanticSkinVeto} from './semantic-skin-veto.mjs';
 import {composeReferenceHairResearch} from './reference-transfer-research.mjs';
 import {planTargetAwareRemoval} from './target-aware-repair.mjs';
+import {createOfflineDeviceEvidence} from './device-evidence.mjs';
 import {makeLandmarkFaceZones} from '../offhair-face-zones.mjs';
 import {prepareHairRemoval,composeInpaintedRGBA} from './hair-removal-core.mjs';
 const S=512,N=S*S,$=id=>document.getElementById(id);
@@ -63,7 +68,7 @@ function clearTransfer(){
  $('transferStatus').textContent='ابتدا بازسازی عصبی مرحلهٔ سوم را اجرا کنید.';
  $('transferMetrics').textContent='No reference transfer generated · research only';
 }
-function dropResult(){proposal=null;reviewSource=null;$('run').disabled=true;$('approve').disabled=true;$('approve').checked=false;$('download').disabled=true;window.__hananehHairStage=null;clearCanvas(maskCanvas);clearCanvas(afterCanvas);clearTransfer();}
+function dropResult(){$('deviceEvidence').disabled=true;proposal=null;reviewSource=null;$('run').disabled=true;$('approve').disabled=true;$('approve').checked=false;$('download').disabled=true;window.__hananehHairStage=null;clearCanvas(maskCanvas);clearCanvas(afterCanvas);clearTransfer();}
 function reset(){token++;imageData=null;originalCanvas.getContext('2d').clearRect(0,0,S,S);for(const c of [originalCanvas,beforeCanvas])clearCanvas(c);dropResult();$('analyze').disabled=true;$('photo').value='';$('sample').value='';status('یک تصویر محلی برای شروع انتخاب کنید.');$('metrics').textContent='Ready';}
 $('clear').addEventListener('click',reset);reset();
 async function prepareOffline(){
@@ -84,7 +89,7 @@ async function prepareOffline(){
   const manifest=await manifestResponse.json();
   const assets=['./hair-removal-studio.html','./hair-removal-core.mjs',
    './semantic-skin-veto.mjs','./reference-transfer-research.mjs',
-   './target-aware-repair.mjs',
+   './target-aware-repair.mjs','./device-evidence.mjs',
    '../offhair-face-zones.mjs','../offhair-multiclass-baseline.mjs','./ort/ort.min.js',
    '../hair-segmenter.mjs','../mask-utils.mjs','../vendor/vision_bundle.mjs',
    '../models/hair_segmenter.tflite','../models/blaze_face_short_range.tflite',
@@ -181,7 +186,7 @@ $('analyze').addEventListener('click',analyze);
 $('approve').addEventListener('change',()=>{
  if(!$('approve').checked){
   // Withdrawal invalidates both current export and any in-flight neural output.
-  token++;$('download').disabled=true;window.__hananehHairStage=null;
+  token++;$('download').disabled=true;$('deviceEvidence').disabled=true;window.__hananehHairStage=null;
   clearCanvas(afterCanvas);clearTransfer();
  }
  $('run').disabled=!(proposal&&$('approve').checked);
@@ -248,6 +253,7 @@ async function inpaint(){
     model:'MI-GAN 512',privacy:'no customer image uploaded'};
   $('metrics').textContent=JSON.stringify(proof,null,2);
   window.__hananehHairStage=proof;
+  $('deviceEvidence').disabled=false;
   $('previewTransfer').disabled=false;
  }catch(e){
   if(key===token){
@@ -334,6 +340,36 @@ $('targetAware').addEventListener('click',async()=>{
   if(key===token&&refKey===transferToken&&window.__hananehTransferStage?.ok&&$('approve').checked)
    $('targetAware').disabled=false;
  }
+});
+$('deviceEvidence').addEventListener('click',()=>{
+ if(!$('approve').checked||$('deviceEvidence').disabled||!window.__hananehHairStage?.realInpainting)return;
+ const cores=Number(navigator.hardwareConcurrency||0);
+ const bucket=cores>0?(cores<=2?2:cores<=4?4:cores<=8?8:16):null;
+ const output=createOfflineDeviceEvidence({
+  hair:window.__hananehHairStage,
+  transfer:window.__hananehTransferStage,
+  target:window.__hananehTargetAwareStage,
+  offlinePackageReady:window.__hananehOfflineReady===true,
+  runtime:{
+   isAndroid:/Android/i.test(navigator.userAgent),
+   disconnected:navigator.onLine===false,
+   crossOriginIsolated:crossOriginIsolated===true,
+   serviceWorkerControlled:!!navigator.serviceWorker?.controller,
+   deviceMemoryGiB:navigator.deviceMemory??null,
+   hardwareConcurrencyBucket:bucket,
+   jsHeapUsedBytes:performance.memory?.usedJSHeapSize??null
+  }
+ });
+ if(!output.ok){
+  $('deviceEvidenceStatus').textContent='گزارش تأیید نشد: بازسازی محلی معتبر ثبت نشده است.';
+  return;
+ }
+ const url=URL.createObjectURL(new Blob([JSON.stringify(output,null,2)+'\n'],
+  {type:'application/json'}));
+ const a=document.createElement('a');a.href=url;
+ a.download='hananeh-anonymous-device-evidence.json';a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ $('deviceEvidenceStatus').textContent='گزارش فنی ناشناس ذخیره شد؛ هیچ عکسی در آن نیست.';
 });
 $('download').addEventListener('click',()=>{
  const a=document.createElement('a');a.href=afterCanvas.toDataURL('image/png');a.download='hananeh-hair-removal-research.png';a.click();

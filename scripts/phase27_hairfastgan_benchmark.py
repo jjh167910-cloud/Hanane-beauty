@@ -43,9 +43,19 @@ def local_file(root, rel, expected_sha, what):
     if not isinstance(rel, str) or not rel or Path(rel).is_absolute() or "\\" in rel:
         raise GateError(f"{what}: unsafe or absolute path")
     root = root.resolve()
-    dest = (root / rel).resolve()
-    if not dest.is_relative_to(root) or not dest.is_file() or dest.is_symlink():
-        raise GateError(f"{what}: missing, symlinked or outside the designated local root")
+    relative = Path(rel)
+    if any(part in ("..", ".") for part in relative.parts):
+        raise GateError(f"{what}: path traversal is prohibited")
+    # Check every pre-resolution path component, including symlinks that point
+    # to another file INSIDE the root (which resolve() would otherwise hide).
+    cursor = root
+    for component in relative.parts:
+        cursor = cursor / component
+        if cursor.is_symlink():
+            raise GateError(f"{what}: symlinked data is prohibited")
+    dest = cursor.resolve()
+    if not dest.is_relative_to(root) or not dest.is_file():
+        raise GateError(f"{what}: missing or outside the designated local root")
     if not isinstance(expected_sha, str) or not SHA256.fullmatch(expected_sha):
         raise GateError(f"{what}: missing SHA-256")
     if sha256(dest) != expected_sha:

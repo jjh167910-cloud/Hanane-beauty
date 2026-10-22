@@ -567,7 +567,11 @@ $('runHairTruth').addEventListener('click',async()=>{
    report.labelIndependenceExternallyVerified=false;
    report.rightsExternallyVerified=false;
    report.trueHairAlphaQualityCertified=false;
-   $('transferStatus').textContent='امتیاز خطای ماسک واردشده محاسبه شد، ولی استقلال و مجوز تصویر هنوز با سند خارجی اثبات نشده است.';
+   report.maskPlausibilityReviewRequired=result.maskPlausibilityReviewRequired;
+   report.scoreUsableAsHairQualityEvidence=false;
+   $('transferStatus').textContent=result.maskPlausibilityReviewRequired?
+    'هشدار: برچسب واردشده با پیشانی/پس‌زمینه اختلاف شدید دارد و برای قضاوت کیفیت مو مناسب نیست. هم‌ترازی و اصل برچسب را بررسی کنید.':
+    'امتیاز خطای ماسک واردشده محاسبه شد، ولی استقلال و مجوز تصویر هنوز با سند خارجی اثبات نشده است.';
   }finally{bitmap.close();}
  }catch(err){
   clearCanvas($('localTruthHeatmap'));

@@ -508,9 +508,12 @@ function updateTruthButton(){
 $('localHairTruth').addEventListener('change',updateTruthButton);
 $('localTruthConsent').addEventListener('change',()=>{
  if(!$('localTruthConsent').checked){
+  // Withdrawal also clears the browser's selected file reference; don't
+  // keep private mask bytes reachable from a dormant <input>.
+  $('localHairTruth').value='';
   window.__hananehLocalGroundTruthStage=null;
   clearCanvas($('localTruthHeatmap'));
-  $('localTruthMetrics').textContent='Ground truth consent was withdrawn; prior scores cleared.';
+  $('localTruthMetrics').textContent='Ground truth consent was withdrawn; selected mask and scores cleared.';
  }
  updateTruthButton();
 });
